@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="arctic">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🏆 Tournaments - Football Tracker</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="tournament.css"/>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-brand">⚽ Football Tracker</div>
+    <div class="nav-right">
+      <ul class="nav-links">
+        <li class="nav-item" onclick="window.location.href='index.html'">🏠 Dashboard</li>
+        <li class="nav-item active">🏆 Tournaments</li>
+      </ul>
+
+      <!-- 2-THEME SWITCHER: Arctic & Galaxy -->
+      <div class="theme-switcher">
+        <span class="theme-label">Theme</span>
+        <div class="theme-dots">
+          <div class="theme-dot dot-arctic active" title="☀️ Arctic" onclick="setTheme('arctic', this)"></div>
+          <div class="theme-dot dot-galaxy"         title="🔮 Galaxy" onclick="setTheme('galaxy', this)"></div>
+        </div>
+        <span class="theme-name" id="themeName">☀️ Arctic</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="container">
+
+    <!-- VIEW: Tournament List -->
+    <div id="view-list">
+      <div class="section-header">
+        <h2>🏆 Tournaments</h2>
+        <div style="display:flex;gap:0.6rem;align-items:center">
+          <select id="filterStatus" onchange="filterTournaments()" class="filter-select">
+            <option value="">All</option>
+            <option value="UPCOMING">Upcoming</option>
+            <option value="ONGOING">Ongoing</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
+          <button class="btn btn-primary" onclick="showTournamentForm()">+ New Tournament</button>
+        </div>
+      </div>
+      <div id="tournament-list" class="tournament-grid"></div>
+    </div>
+
+    <!-- VIEW: Tournament Detail -->
+    <div id="view-detail" class="hidden">
+      <div class="section-header">
+        <button class="btn btn-back" onclick="showListView()">← Back</button>
+        <h2 id="detail-title">Tournament Name</h2>
+        <div style="display:flex;gap:0.6rem">
+          <button class="btn btn-warning btn-sm" id="btn-edit-tournament">Edit</button>
+          <button class="btn btn-danger btn-sm"  id="btn-delete-tournament">Delete</button>
+        </div>
+      </div>
+
+      <!-- Tournament Info -->
+      <div class="tournament-info-bar" id="tournament-info-bar"></div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('matches',this)">📅 Matches</button>
+        <button class="tab" onclick="switchTab('teams',this)">🛡️ Teams</button>
+        <button class="tab" onclick="switchTab('standings',this)">🏆 Standings</button>
+        <button class="tab" onclick="switchTab('stats',this)">📊 Stats</button>
+      </div>
+
+      <!-- Tab Content -->
+      <div id="tab-content" class="tab-content"></div>
+    </div>
+
+  </main>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">Form</h3>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="tournament.js"></script>
+</body>
+</html>

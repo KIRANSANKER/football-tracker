@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="arctic">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>⚽ Football Tracker</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-brand">⚽ Football Tracker</div>
+    <div class="nav-right">
+      <ul class="nav-links">
+        <li class="nav-item active" onclick="loadSection('standings', this)">🏆 Standings</li>
+        <li class="nav-item" onclick="loadSection('matches', this)">📅 Matches</li>
+        <li class="nav-item" onclick="loadSection('teams', this)">🛡️ Teams</li>
+        <li class="nav-item" onclick="loadSection('players', this)">👤 Players</li>
+        <li class="nav-item" onclick="loadSection('stats', this)">📊 Stats</li>
+        <li class="nav-item" onclick="window.location.href='tournament.html'">🏆 Tournaments</li>
+      </ul>
+
+      <!-- 2-THEME SWITCHER: Arctic & Galaxy -->
+      <div class="theme-switcher">
+        <span class="theme-label">Theme</span>
+        <div class="theme-dots">
+          <div class="theme-dot dot-arctic active" title="☀️ Arctic" onclick="setTheme('arctic', this)"></div>
+          <div class="theme-dot dot-galaxy"         title="🔮 Galaxy" onclick="setTheme('galaxy', this)"></div>
+        </div>
+        <span class="theme-name" id="themeName">☀️ Arctic</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main id="app" class="container">
+    <div class="loader">⚽ Loading...</div>
+  </main>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">Form</h3>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
