@@ -22,7 +22,6 @@ public class TournamentController {
     // =============================================
     // TOURNAMENT CRUD
     // =============================================
-
     @GetMapping
     public List<Tournament> getAllTournaments() {
         return tournamentRepo.findAll();
@@ -54,7 +53,6 @@ public class TournamentController {
             t.setStartDate(details.getStartDate());
             t.setEndDate(details.getEndDate());
             t.setStatus(details.getStatus());
-            t.setDescription(details.getDescription());
             return ResponseEntity.ok(tournamentRepo.save(t));
         }).orElse(ResponseEntity.notFound().build());
     }
@@ -69,7 +67,6 @@ public class TournamentController {
     // =============================================
     // TOURNAMENT TEAMS
     // =============================================
-
     @GetMapping("/{id}/teams")
     public List<TournamentTeam> getTeamsInTournament(@PathVariable Long id) {
         return tournamentTeamRepo.findByTournamentId(id);
@@ -82,7 +79,6 @@ public class TournamentController {
         Team team             = teamRepo.findById(teamId).orElse(null);
         if (tournament == null || team == null)
             return ResponseEntity.notFound().build();
-
         TournamentTeam tt = new TournamentTeam();
         tt.setTournament(tournament);
         tt.setTeam(team);
@@ -99,7 +95,6 @@ public class TournamentController {
     // =============================================
     // TOURNAMENT MATCHES
     // =============================================
-
     @GetMapping("/{id}/matches")
     public List<TournamentMatch> getMatchesByTournament(@PathVariable Long id) {
         return tournamentMatchRepo.findByTournamentId(id);
@@ -148,7 +143,6 @@ public class TournamentController {
     // =============================================
     // MATCH EVENTS (GOALS & ASSISTS)
     // =============================================
-
     @GetMapping("/matches/{matchId}/events")
     public List<TournamentMatchEvent> getMatchEvents(@PathVariable Long matchId) {
         return eventRepo.findByMatchId(matchId);
@@ -156,59 +150,135 @@ public class TournamentController {
 
     @PostMapping("/matches/{matchId}/events")
     public ResponseEntity<?> addEvent(
-            @PathVariable Long matchId, @RequestBody TournamentMatchEvent event) {
+            @PathVariable Long matchId,
+            @RequestBody TournamentMatchEvent event) {
         TournamentMatch match = tournamentMatchRepo.findById(matchId).orElse(null);
         if (match == null) return ResponseEntity.notFound().build();
         event.setMatch(match);
 
-        // Auto update score if it's a goal
+        // Auto update score for GOAL
         if ("GOAL".equals(event.getEventType())) {
-            Team scoringTeam = event.getTeam();
-            if (scoringTeam != null) {
-                if (match.getHomeTeam().getId().equals(scoringTeam.getId())) {
+            if (event.isOwnGoal()) {
+                // Own goal — scores for the OTHER team
+                if (match.getHomeTeam().getId().equals(event.getTeam().getId())) {
+                    match.setAwayScore(match.getAwayScore() + 1);
+                } else {
+                    match.setHomeScore(match.getHomeScore() + 1);
+                }
+            } else {
+                if (match.getHomeTeam().getId().equals(event.getTeam().getId())) {
                     match.setHomeScore(match.getHomeScore() + 1);
                 } else {
                     match.setAwayScore(match.getAwayScore() + 1);
                 }
-                tournamentMatchRepo.save(match);
             }
+            tournamentMatchRepo.save(match);
         }
         return ResponseEntity.ok(eventRepo.save(event));
     }
 
+    // ---- Edit existing event ----
+    @PutMapping("/events/{eventId}")
+    public ResponseEntity<?> updateEvent(
+            @PathVariable Long eventId,
+            @RequestBody TournamentMatchEvent details) {
+        return eventRepo.findById(eventId).map(event -> {
+            // Reverse old score
+            TournamentMatch match = event.getMatch();
+            if ("GOAL".equals(event.getEventType())) {
+                if (event.isOwnGoal()) {
+                    if (match.getHomeTeam().getId().equals(event.getTeam().getId())) {
+                        match.setAwayScore(Math.max(0, match.getAwayScore() - 1));
+                    } else {
+                        match.setHomeScore(Math.max(0, match.getHomeScore() - 1));
+                    }
+                } else {
+                    if (match.getHomeTeam().getId().equals(event.getTeam().getId())) {
+                        match.setHomeScore(Math.max(0, match.getHomeScore() - 1));
+                    } else {
+                        match.setAwayScore(Math.max(0, match.getAwayScore() - 1));
+                    }
+                }
+            }
+
+            // Apply new values
+            event.setPlayer(details.getPlayer());
+            event.setTeam(details.getTeam());
+            event.setMinute(details.getMinute());
+            event.setOwnGoal(details.isOwnGoal());
+            event.setAssistBy(details.getAssistBy());
+
+            // Apply new score
+            if ("GOAL".equals(event.getEventType())) {
+                if (details.isOwnGoal()) {
+                    if (match.getHomeTeam().getId().equals(details.getTeam().getId())) {
+                        match.setAwayScore(match.getAwayScore() + 1);
+                    } else {
+                        match.setHomeScore(match.getHomeScore() + 1);
+                    }
+                } else {
+                    if (match.getHomeTeam().getId().equals(details.getTeam().getId())) {
+                        match.setHomeScore(match.getHomeScore() + 1);
+                    } else {
+                        match.setAwayScore(match.getAwayScore() + 1);
+                    }
+                }
+                tournamentMatchRepo.save(match);
+            }
+            return ResponseEntity.ok(eventRepo.save(event));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
     @DeleteMapping("/events/{eventId}")
     public ResponseEntity<Void> deleteEvent(@PathVariable Long eventId) {
-        if (!eventRepo.existsById(eventId)) return ResponseEntity.notFound().build();
-        eventRepo.deleteById(eventId);
-        return ResponseEntity.noContent().build();
+        return eventRepo.findById(eventId).map(event -> {
+            // Reverse score on delete
+            TournamentMatch match = event.getMatch();
+            if ("GOAL".equals(event.getEventType())) {
+                if (event.isOwnGoal()) {
+                    if (match.getHomeTeam().getId().equals(event.getTeam().getId())) {
+                        match.setAwayScore(Math.max(0, match.getAwayScore() - 1));
+                    } else {
+                        match.setHomeScore(Math.max(0, match.getHomeScore() - 1));
+                    }
+                } else {
+                    if (match.getHomeTeam().getId().equals(event.getTeam().getId())) {
+                        match.setHomeScore(Math.max(0, match.getHomeScore() - 1));
+                    } else {
+                        match.setAwayScore(Math.max(0, match.getAwayScore() - 1));
+                    }
+                }
+                tournamentMatchRepo.save(match);
+            }
+            eventRepo.deleteById(eventId);
+            return ResponseEntity.noContent().<Void>build();
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     // =============================================
-    // TOURNAMENT STATS (Player Stats per Tournament)
+    // TOURNAMENT STATS
     // =============================================
-
     @GetMapping("/{id}/stats")
     public ResponseEntity<?> getTournamentStats(@PathVariable Long id) {
         List<TournamentMatchEvent> events = eventRepo.findAllByTournament(id);
-
         Map<Long, Map<String, Object>> statsMap = new LinkedHashMap<>();
+
         for (TournamentMatchEvent e : events) {
+            if (e.isOwnGoal()) continue; // skip own goals for scorer stats
             Long pid = e.getPlayer().getId();
             if (!statsMap.containsKey(pid)) {
                 Map<String, Object> s = new LinkedHashMap<>();
                 s.put("playerId",   pid);
                 s.put("playerName", e.getPlayer().getName());
                 s.put("teamName",   e.getTeam().getName());
-                s.put("goals",      0);
-                s.put("assists",    0);
+                s.put("goals",   0);
+                s.put("assists", 0);
                 statsMap.put(pid, s);
             }
             Map<String, Object> s = statsMap.get(pid);
-            if ("GOAL".equals(e.getEventType())) {
+            if ("GOAL".equals(e.getEventType()))
                 s.put("goals", (int) s.get("goals") + 1);
-            }
 
-            // Count assists
             if (e.getAssistBy() != null) {
                 Long apid = e.getAssistBy().getId();
                 if (!statsMap.containsKey(apid)) {
@@ -216,8 +286,8 @@ public class TournamentController {
                     as.put("playerId",   apid);
                     as.put("playerName", e.getAssistBy().getName());
                     as.put("teamName",   e.getTeam().getName());
-                    as.put("goals",      0);
-                    as.put("assists",    0);
+                    as.put("goals",   0);
+                    as.put("assists", 0);
                     statsMap.put(apid, as);
                 }
                 Map<String, Object> as = statsMap.get(apid);
@@ -233,27 +303,23 @@ public class TournamentController {
     // =============================================
     // TOURNAMENT STANDINGS
     // =============================================
-
     @GetMapping("/{id}/standings")
     public ResponseEntity<?> getTournamentStandings(@PathVariable Long id) {
-        List<TournamentTeam> teams   = tournamentTeamRepo.findByTournamentId(id);
+        List<TournamentTeam> teams    = tournamentTeamRepo.findByTournamentId(id);
         List<TournamentMatch> matches = tournamentMatchRepo
                 .findByTournamentIdAndStatus(id, "COMPLETED");
 
         Map<Long, Map<String, Object>> table = new LinkedHashMap<>();
-
         for (TournamentTeam tt : teams) {
             Long tid = tt.getTeam().getId();
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("teamId",   tid);
             row.put("teamName", tt.getTeam().getName());
-            row.put("played",   0);
-            row.put("won",      0);
-            row.put("drawn",    0);
-            row.put("lost",     0);
-            row.put("gf",       0);
-            row.put("ga",       0);
-            row.put("points",   0);
+            row.put("played",  0);
+            row.put("won",     0);
+            row.put("drawn",   0);
+            row.put("lost",    0);
+            row.put("points",  0);
             table.put(tid, row);
         }
 
@@ -265,21 +331,17 @@ public class TournamentController {
 
             if (table.containsKey(htid)) {
                 Map<String, Object> r = table.get(htid);
-                r.put("played", (int) r.get("played") + 1);
-                r.put("gf",     (int) r.get("gf") + hs);
-                r.put("ga",     (int) r.get("ga") + as);
-                if (hs > as)      { r.put("won",   (int)r.get("won")+1);   r.put("points",(int)r.get("points")+3); }
-                else if (hs == as){ r.put("drawn", (int)r.get("drawn")+1); r.put("points",(int)r.get("points")+1); }
-                else              { r.put("lost",  (int)r.get("lost")+1); }
+                r.put("played", (int)r.get("played") + 1);
+                if (hs > as)       { r.put("won",   (int)r.get("won")+1);   r.put("points",(int)r.get("points")+3); }
+                else if (hs == as) { r.put("drawn", (int)r.get("drawn")+1); r.put("points",(int)r.get("points")+1); }
+                else               { r.put("lost",  (int)r.get("lost")+1); }
             }
             if (table.containsKey(atid)) {
                 Map<String, Object> r = table.get(atid);
-                r.put("played", (int) r.get("played") + 1);
-                r.put("gf",     (int) r.get("gf") + as);
-                r.put("ga",     (int) r.get("ga") + hs);
-                if (as > hs)      { r.put("won",   (int)r.get("won")+1);   r.put("points",(int)r.get("points")+3); }
-                else if (hs == as){ r.put("drawn", (int)r.get("drawn")+1); r.put("points",(int)r.get("points")+1); }
-                else              { r.put("lost",  (int)r.get("lost")+1); }
+                r.put("played", (int)r.get("played") + 1);
+                if (as > hs)       { r.put("won",   (int)r.get("won")+1);   r.put("points",(int)r.get("points")+3); }
+                else if (hs == as) { r.put("drawn", (int)r.get("drawn")+1); r.put("points",(int)r.get("points")+1); }
+                else               { r.put("lost",  (int)r.get("lost")+1); }
             }
         }
 

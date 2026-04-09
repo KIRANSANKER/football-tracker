@@ -1,14 +1,15 @@
 // =============================================
 // Football Tracker - app.js
-// Includes: Theme Switcher + All CRUD Logic
+// Updated: Player Photos, Simplified Standings,
+//          League Stats Filter
 // =============================================
 
 // =============================================
 // THEME SWITCHER
 // =============================================
 const THEME_NAMES = {
-  arctic:   '☀️ Arctic',
-  galaxy:   '🔮 Galaxy'
+  arctic: '☀️ Arctic',
+  galaxy: '🔮 Galaxy'
 };
 
 function setTheme(theme, dot) {
@@ -41,8 +42,7 @@ const loader = () => `<div class="loader">⚽ Loading...</div>`;
 
 async function apiFetch(url, options = {}) {
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
+    headers: { 'Content-Type': 'application/json' }, ...options
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return options.method === 'DELETE' ? null : res.json();
@@ -50,27 +50,21 @@ async function apiFetch(url, options = {}) {
 
 function openModal(title, bodyHTML) {
   document.getElementById('modal-title').textContent = title;
-  document.getElementById('modal-body').innerHTML   = bodyHTML;
+  document.getElementById('modal-body').innerHTML = bodyHTML;
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
-
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
 }
-
 function setActiveNav(el) {
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
 }
 
-// =============================================
-// LOAD SECTION
-// =============================================
 async function loadSection(section, navEl) {
   if (navEl) setActiveNav(navEl);
   app().innerHTML = loader();
   allTeams = await apiFetch(`${API}/teams`).catch(() => []);
-
   switch (section) {
     case 'standings': return renderStandings();
     case 'matches':   return renderMatches();
@@ -81,7 +75,7 @@ async function loadSection(section, navEl) {
 }
 
 // =============================================
-// STANDINGS
+// STANDINGS — Simplified (P W D L Pts only)
 // =============================================
 async function renderStandings() {
   const data = await apiFetch(`${API}/standings`);
@@ -93,23 +87,25 @@ async function renderStandings() {
       <table>
         <thead>
           <tr>
-            <th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th>
-            <th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
+            <th>#</th>
+            <th>Team</th>
+            <th>P</th>
+            <th>W</th>
+            <th>D</th>
+            <th>L</th>
+            <th>Pts</th>
           </tr>
         </thead>
         <tbody>
           ${data.map((s, i) => `
             <tr>
-              <td><span class="rank-badge rank-${i+1 <= 3 ? i+1 : ''}">${i+1}</span></td>
+              <td><span class="rank-badge ${i < 3 ? 'rank-' + (i+1) : ''}">${i+1}</span></td>
               <td><strong>${s.team.name}</strong><br>
                 <small style="color:var(--muted)">${s.team.city}</small></td>
               <td>${s.played}</td>
               <td style="color:var(--accent)">${s.won}</td>
               <td>${s.drawn}</td>
               <td style="color:var(--danger)">${s.lost}</td>
-              <td>${s.goalsFor}</td>
-              <td>${s.goalsAgainst}</td>
-              <td>${s.goalsFor - s.goalsAgainst >= 0 ? '+' : ''}${s.goalsFor - s.goalsAgainst}</td>
               <td><strong style="font-size:1.1rem;color:var(--accent)">${s.points}</strong></td>
             </tr>`).join('')}
         </tbody>
@@ -207,7 +203,7 @@ async function renderTeams() {
           <p>📅 Founded: ${t.foundedYear || '—'}</p>
           <div class="card-actions">
             <button class="btn btn-warning btn-sm"
-              onclick="showTeamForm(${t.id}, '${t.name}', '${t.city}', ${t.foundedYear})">Edit</button>
+              onclick="showTeamForm(${t.id},'${t.name}','${t.city}',${t.foundedYear})">Edit</button>
             <button class="btn btn-danger btn-sm"
               onclick="deleteTeam(${t.id})">Delete</button>
           </div>
@@ -215,14 +211,17 @@ async function renderTeams() {
     </div>`;
 }
 
-function showTeamForm(id = null, name = '', city = '', foundedYear = '') {
+function showTeamForm(id=null, name='', city='', foundedYear='') {
   openModal(id ? 'Edit Team' : 'Add Team', `
     <div class="form-group"><label>Team Name</label>
-      <input type="text" id="f-name" value="${name}" placeholder="e.g. Manchester United"/></div>
+      <input type="text" id="f-name" value="${name}"
+             placeholder="e.g. Manchester United"/></div>
     <div class="form-group"><label>City</label>
-      <input type="text" id="f-city" value="${city}" placeholder="e.g. Manchester"/></div>
+      <input type="text" id="f-city" value="${city}"
+             placeholder="e.g. Manchester"/></div>
     <div class="form-group"><label>Founded Year</label>
-      <input type="number" id="f-year" value="${foundedYear}" placeholder="e.g. 1878"/></div>
+      <input type="number" id="f-year" value="${foundedYear}"
+             placeholder="e.g. 1878"/></div>
     <div class="form-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveTeam(${id})">Save Team</button>
@@ -249,7 +248,7 @@ async function deleteTeam(id) {
 }
 
 // =============================================
-// PLAYERS
+// PLAYERS — With Photo Support
 // =============================================
 async function renderPlayers() {
   const data = await apiFetch(`${API}/players`);
@@ -260,7 +259,14 @@ async function renderPlayers() {
     </div>
     <div class="grid">
       ${data.map(p => `
-        <div class="card">
+        <div class="card player-card">
+          <div class="player-photo-wrap">
+            ${p.photoUrl
+              ? `<img src="${p.photoUrl}" class="player-photo" alt="${p.name}"/>`
+              : `<div class="player-photo-placeholder">
+                   ${p.name.charAt(0).toUpperCase()}
+                 </div>`}
+          </div>
           <h3>#${p.jerseyNumber} ${p.name}</h3>
           <p>🎽 ${p.position || '—'}</p>
           <p>🌍 ${p.nationality || '—'}</p>
@@ -270,7 +276,7 @@ async function renderPlayers() {
             <button class="btn btn-warning btn-sm"
               onclick="showPlayerForm(${p.id},'${p.name}','${p.position}',
               ${p.jerseyNumber},'${p.nationality}',${p.age},
-              ${p.team?.id || null})">Edit</button>
+              ${p.team?.id || null},'${p.photoUrl || ''}')">Edit</button>
             <button class="btn btn-danger btn-sm"
               onclick="deletePlayer(${p.id})">Delete</button>
           </div>
@@ -278,15 +284,52 @@ async function renderPlayers() {
     </div>`;
 }
 
-function showPlayerForm(id=null, name='', position='', jersey=0, nationality='', age=0, teamId=null) {
+function showPlayerForm(id=null, name='', position='',
+                        jersey=0, nationality='', age=0,
+                        teamId=null, photoUrl='') {
   const teamOptions = allTeams.map(t =>
-    `<option value="${t.id}" ${t.id === teamId ? 'selected' : ''}>${t.name}</option>`).join('');
+    `<option value="${t.id}" ${t.id === teamId ? 'selected' : ''}>${t.name}</option>`
+  ).join('');
+
   openModal(id ? 'Edit Player' : 'Add Player', `
+
+    <!-- Photo Preview -->
+    <div style="text-align:center;margin-bottom:1rem">
+      <div id="photoPreview" style="width:80px;height:80px;border-radius:50%;
+           margin:0 auto 0.5rem;overflow:hidden;background:var(--surface2);
+           display:flex;align-items:center;justify-content:center;
+           font-size:2rem;font-weight:700;color:var(--accent)">
+        ${photoUrl
+          ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover"/>`
+          : (name ? name.charAt(0).toUpperCase() : '👤')}
+      </div>
+      <small style="color:var(--muted)">Player Photo</small>
+    </div>
+
+    <!-- Photo Options -->
+    <div class="form-group">
+      <label>📷 Photo — Enter URL</label>
+      <input type="text" id="f-photoUrl" value="${photoUrl}"
+             placeholder="https://example.com/photo.jpg"
+             oninput="previewPhotoUrl(this.value)"/>
+    </div>
+    <div class="form-group">
+      <label>📁 Or Upload from Device</label>
+      <input type="file" id="f-photoFile" accept="image/*"
+             onchange="previewPhotoFile(this)"
+             style="background:var(--surface2);padding:0.4rem;
+                    border-radius:6px;width:100%;color:var(--text)"/>
+    </div>
+
+    <hr style="border-color:var(--border);margin:0.8rem 0"/>
+
     <div class="form-row">
       <div class="form-group"><label>Full Name</label>
-        <input type="text" id="f-name" value="${name}" placeholder="Player name"/></div>
+        <input type="text" id="f-name" value="${name}"
+               placeholder="Player name"/></div>
       <div class="form-group"><label>Jersey #</label>
-        <input type="number" id="f-jersey" value="${jersey}" min="1" max="99"/></div>
+        <input type="number" id="f-jersey" value="${jersey}"
+               min="1" max="99"/></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Position</label>
@@ -296,10 +339,12 @@ function showPlayerForm(id=null, name='', position='', jersey=0, nationality='',
         </select>
       </div>
       <div class="form-group"><label>Age</label>
-        <input type="number" id="f-age" value="${age}" min="15" max="50"/></div>
+        <input type="number" id="f-age" value="${age}"
+               min="15" max="50"/></div>
     </div>
     <div class="form-group"><label>Nationality</label>
-      <input type="text" id="f-nat" value="${nationality}" placeholder="e.g. English"/></div>
+      <input type="text" id="f-nat" value="${nationality}"
+             placeholder="e.g. English"/></div>
     <div class="form-group"><label>Team</label>
       <select id="f-team">
         <option value="">-- No Team --</option>${teamOptions}
@@ -307,19 +352,46 @@ function showPlayerForm(id=null, name='', position='', jersey=0, nationality='',
     </div>
     <div class="form-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="savePlayer(${id})">Save Player</button>
+      <button class="btn btn-primary"
+              onclick="savePlayer(${id})">Save Player</button>
     </div>`);
 }
 
+// Preview photo from URL
+function previewPhotoUrl(url) {
+  const preview = document.getElementById('photoPreview');
+  if (url) {
+    preview.innerHTML =
+      `<img src="${url}" style="width:100%;height:100%;object-fit:cover"
+            onerror="this.parentElement.innerHTML='❌'"/>`;
+  }
+}
+
+// Preview photo from file
+function previewPhotoFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('photoPreview').innerHTML =
+      `<img src="${e.target.result}"
+            style="width:100%;height:100%;object-fit:cover"/>`;
+    document.getElementById('f-photoUrl').value = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 async function savePlayer(id) {
-  const teamId = document.getElementById('f-team').value;
-  const body   = {
+  const teamId   = document.getElementById('f-team').value;
+  const photoUrl = document.getElementById('f-photoUrl').value;
+  const body = {
     name:         document.getElementById('f-name').value,
     jerseyNumber: +document.getElementById('f-jersey').value,
     position:     document.getElementById('f-pos').value,
     age:          +document.getElementById('f-age').value,
     nationality:  document.getElementById('f-nat').value,
-    team: teamId ? { id: +teamId } : null
+    photoUrl:     photoUrl || null,
+    team:         teamId ? { id: +teamId } : null
   };
   const url    = id ? `${API}/players/${id}` : `${API}/players`;
   const method = id ? 'PUT' : 'POST';
@@ -335,9 +407,60 @@ async function deletePlayer(id) {
 }
 
 // =============================================
-// PLAYER STATS
+// STATS — Total + League Wise with Filter
 // =============================================
+let tournaments      = [];
+let selectedTournId  = 'all';
+
 async function renderStats() {
+  // Load tournaments for filter
+  tournaments = await apiFetch(`${API}/tournaments`).catch(() => []);
+
+  app().innerHTML = `
+    <div class="section-header">
+      <h2>📊 Player Statistics</h2>
+      <button class="btn btn-primary" onclick="showStatsForm()">+ Add Stats</button>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="stats-filter-bar">
+      <span class="stats-filter-label">Filter by:</span>
+      <div class="stats-filter-tabs">
+        <button class="stats-tab active" onclick="filterStats('all', this)">
+          🌍 Total Stats
+        </button>
+        ${tournaments.map(t => `
+          <button class="stats-tab"
+                  onclick="filterStats('${t.id}', this)">
+            🏆 ${t.name}
+          </button>`).join('')}
+      </div>
+    </div>
+
+    <div id="stats-content">
+      <div class="loader">⚽ Loading stats...</div>
+    </div>`;
+
+  filterStats('all', document.querySelector('.stats-tab.active'));
+}
+
+async function filterStats(tournId, el) {
+  selectedTournId = tournId;
+  document.querySelectorAll('.stats-tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  const content = document.getElementById('stats-content');
+  content.innerHTML = loader();
+
+  if (tournId === 'all') {
+    await renderTotalStats(content);
+  } else {
+    await renderTournamentStats(tournId, content);
+  }
+}
+
+// ---- Total Stats (all matches) ----
+async function renderTotalStats(content) {
   const [stats, players] = await Promise.all([
     apiFetch(`${API}/stats/top-scorers`),
     apiFetch(`${API}/players`)
@@ -346,23 +469,21 @@ async function renderStats() {
   const map = {};
   stats.forEach(s => {
     const pid = s.player.id;
-    if (!map[pid]) map[pid] = { player: s.player, goals: 0, assists: 0, yellows: 0, reds: 0 };
+    if (!map[pid]) map[pid] = {
+      player: s.player, goals: 0, assists: 0, yellows: 0, reds: 0
+    };
     map[pid].goals   += s.goals;
     map[pid].assists += s.assists;
     map[pid].yellows += s.yellowCards;
     map[pid].reds    += s.redCards;
   });
-  const rows = Object.values(map).sort((a, b) => b.goals - a.goals);
 
-  const totalGoals   = rows.reduce((a, r) => a + r.goals,   0);
-  const totalAssists = rows.reduce((a, r) => a + r.assists, 0);
-  const totalYellow  = rows.reduce((a, r) => a + r.yellows, 0);
+  const rows        = Object.values(map).sort((a, b) => b.goals - a.goals);
+  const totalGoals  = rows.reduce((a, r) => a + r.goals,   0);
+  const totalAssist = rows.reduce((a, r) => a + r.assists, 0);
+  const totalYellow = rows.reduce((a, r) => a + r.yellows, 0);
 
-  app().innerHTML = `
-    <div class="section-header">
-      <h2>📊 Player Statistics</h2>
-      <button class="btn btn-primary" onclick="showStatsForm()">+ Add Stats</button>
-    </div>
+  content.innerHTML = `
     <div class="stats-summary">
       <div class="stat-box">
         <div class="stat-value">${players.length}</div>
@@ -373,7 +494,7 @@ async function renderStats() {
         <div class="stat-label">Total Goals</div>
       </div>
       <div class="stat-box">
-        <div class="stat-value">${totalAssists}</div>
+        <div class="stat-value">${totalAssist}</div>
         <div class="stat-label">Total Assists</div>
       </div>
       <div class="stat-box">
@@ -393,13 +514,106 @@ async function renderStats() {
         <tbody>
           ${rows.map((r, i) => `
             <tr>
-              <td>${i + 1}</td>
-              <td><strong>${r.player.name}</strong></td>
+              <td>${i+1}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:0.6rem">
+                  ${r.player.photoUrl
+                    ? `<img src="${r.player.photoUrl}"
+                            style="width:28px;height:28px;border-radius:50%;object-fit:cover"/>`
+                    : `<div style="width:28px;height:28px;border-radius:50%;
+                                  background:var(--surface2);display:flex;
+                                  align-items:center;justify-content:center;
+                                  font-size:0.75rem;font-weight:700;color:var(--accent)">
+                         ${r.player.name.charAt(0)}
+                       </div>`}
+                  <strong>${r.player.name}</strong>
+                </div>
+              </td>
               <td>${r.player.team?.name || '—'}</td>
               <td style="color:var(--accent);font-weight:700">${r.goals}</td>
               <td>${r.assists}</td>
               <td style="color:var(--warning)">${r.yellows}</td>
               <td style="color:var(--danger)">${r.reds}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ---- Tournament / League Stats ----
+async function renderTournamentStats(tournId, content) {
+  const data = await apiFetch(`${API}/tournaments/${tournId}/stats`).catch(() => []);
+
+  if (data.length === 0) {
+    content.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">📊</div>
+        <p>No stats for this tournament yet.</p>
+      </div>`;
+    return;
+  }
+
+  const topGoals   = [...data].sort((a,b) => b.goals   - a.goals).slice(0,3);
+  const topAssists = [...data].sort((a,b) => b.assists - a.assists).slice(0,3);
+
+  content.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem">
+      <div>
+        <h3 style="color:var(--accent);margin-bottom:0.8rem;font-size:1rem">
+          ⚽ Top Scorers
+        </h3>
+        ${topGoals.map((p,i) => `
+          <div style="display:flex;align-items:center;gap:0.8rem;
+               background:var(--surface);border-radius:8px;
+               padding:0.7rem 1rem;margin-bottom:0.5rem;
+               border:1px solid var(--border)">
+            <span style="font-size:1.2rem">${['🥇','🥈','🥉'][i]}</span>
+            <div style="flex:1">
+              <div style="font-weight:600">${p.playerName}</div>
+              <div style="font-size:0.78rem;color:var(--muted)">${p.teamName}</div>
+            </div>
+            <span style="font-size:1.3rem;font-weight:800;color:var(--accent)">
+              ${p.goals}
+            </span>
+          </div>`).join('')}
+      </div>
+      <div>
+        <h3 style="color:#42a5f5;margin-bottom:0.8rem;font-size:1rem">
+          🅰️ Top Assists
+        </h3>
+        ${topAssists.map((p,i) => `
+          <div style="display:flex;align-items:center;gap:0.8rem;
+               background:var(--surface);border-radius:8px;
+               padding:0.7rem 1rem;margin-bottom:0.5rem;
+               border:1px solid var(--border)">
+            <span style="font-size:1.2rem">${['🥇','🥈','🥉'][i]}</span>
+            <div style="flex:1">
+              <div style="font-weight:600">${p.playerName}</div>
+              <div style="font-size:0.78rem;color:var(--muted)">${p.teamName}</div>
+            </div>
+            <span style="font-size:1.3rem;font-weight:800;color:#42a5f5">
+              ${p.assists}
+            </span>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Player</th><th>Team</th>
+            <th>⚽ Goals</th><th>🅰️ Assists</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.map((p,i) => `
+            <tr>
+              <td>${i+1}</td>
+              <td><strong>${p.playerName}</strong></td>
+              <td>${p.teamName}</td>
+              <td style="color:var(--accent);font-weight:700">${p.goals}</td>
+              <td style="color:#42a5f5">${p.assists}</td>
             </tr>`).join('')}
         </tbody>
       </table>
@@ -414,7 +628,8 @@ async function showStatsForm() {
   const playerOpts = players.map(p =>
     `<option value="${p.id}">${p.name}</option>`).join('');
   const matchOpts  = matches.map(m =>
-    `<option value="${m.id}">${m.homeTeam.name} vs ${m.awayTeam.name} (${m.matchDate || 'TBD'})</option>`).join('');
+    `<option value="${m.id}">${m.homeTeam.name} vs ${m.awayTeam.name}
+     (${m.matchDate || 'TBD'})</option>`).join('');
 
   openModal('Add Player Stats', `
     <div class="form-group"><label>Player</label>
@@ -453,14 +668,10 @@ async function saveStats() {
   renderStats();
 }
 
-// =============================================
-// MODAL CLOSE ON OVERLAY CLICK
-// =============================================
+// Close modal on overlay click
 document.getElementById('modal-overlay').addEventListener('click', (e) => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 });
 
-// =============================================
-// INIT
-// =============================================
+// Init
 loadSection('standings', document.querySelector('.nav-item.active'));
