@@ -34,17 +34,28 @@ window.addEventListener('DOMContentLoaded', () => {
 // =============================================
 // API + UTILITY
 // =============================================
-const API    = 'http://localhost:8080/api';
+const API = 'http://localhost:8080/api';
 let allTeams = [];
+let allPlayers = [];
 
-const app    = () => document.getElementById('app');
+const app = () => document.getElementById('app');
 const loader = () => `<div class="loader">⚽ Loading...</div>`;
 
 async function apiFetch(url, options = {}) {
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' }, ...options
+    headers: { 'Content-Type': 'application/json' },
+    ...options
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const text = await res.text();
+      if (text) msg += ` - ${text}`;
+    } catch {}
+    throw new Error(msg);
+  }
+
   return options.method === 'DELETE' ? null : res.json();
 }
 
@@ -53,9 +64,11 @@ function openModal(title, bodyHTML) {
   document.getElementById('modal-body').innerHTML = bodyHTML;
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
+
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
 }
+
 function setActiveNav(el) {
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
@@ -64,13 +77,15 @@ function setActiveNav(el) {
 async function loadSection(section, navEl) {
   if (navEl) setActiveNav(navEl);
   app().innerHTML = loader();
+
   allTeams = await apiFetch(`${API}/teams`).catch(() => []);
+
   switch (section) {
     case 'standings': return renderStandings();
-    case 'matches':   return renderMatches();
-    case 'teams':     return renderTeams();
-    case 'players':   return renderPlayers();
-    case 'stats':     return renderStats();
+    case 'matches': return renderMatches();
+    case 'teams': return renderTeams();
+    case 'players': return renderPlayers();
+    case 'stats': return renderStats();
   }
 }
 
@@ -100,14 +115,17 @@ async function renderStandings() {
           ${data.map((s, i) => `
             <tr>
               <td><span class="rank-badge ${i < 3 ? 'rank-' + (i+1) : ''}">${i+1}</span></td>
-              <td><strong>${s.team.name}</strong><br>
-                <small style="color:var(--muted)">${s.team.city}</small></td>
+              <td>
+                <strong>${s.team.name}</strong><br>
+                <small style="color:var(--muted)">${s.team.city}</small>
+              </td>
               <td>${s.played}</td>
               <td style="color:var(--accent)">${s.won}</td>
               <td>${s.drawn}</td>
               <td style="color:var(--danger)">${s.lost}</td>
               <td><strong style="font-size:1.1rem;color:var(--accent)">${s.points}</strong></td>
-            </tr>`).join('')}
+            </tr>
+          `).join('')}
         </tbody>
       </table>
     </div>`;
@@ -123,6 +141,7 @@ async function renderMatches() {
       <h2>📅 Matches</h2>
       <button class="btn btn-primary" onclick="showAddMatchForm()">+ Add Match</button>
     </div>
+
     ${data.length === 0
       ? `<div class="empty-state"><div class="icon">📭</div><p>No matches found.</p></div>`
       : data.map(m => `
@@ -136,51 +155,79 @@ async function renderMatches() {
             </div>
           </div>
           <div class="match-team away">${m.awayTeam.name}</div>
-        </div>`).join('')}`;
+        </div>
+      `).join('')
+    }`;
 }
 
 function showAddMatchForm() {
   const teamOptions = allTeams.map(t =>
     `<option value="${t.id}">${t.name}</option>`).join('');
+
   openModal('Add Match', `
-    <div class="form-group"><label>Home Team</label>
-      <select id="f-home">${teamOptions}</select></div>
-    <div class="form-group"><label>Away Team</label>
-      <select id="f-away">${teamOptions}</select></div>
-    <div class="form-row">
-      <div class="form-group"><label>Home Score</label>
-        <input type="number" id="f-hscore" value="0" min="0"/></div>
-      <div class="form-group"><label>Away Score</label>
-        <input type="number" id="f-ascore" value="0" min="0"/></div>
+    <div class="form-group">
+      <label>Home Team</label>
+      <select id="f-home">${teamOptions}</select>
     </div>
-    <div class="form-group"><label>Match Date</label>
-      <input type="date" id="f-date"/></div>
-    <div class="form-group"><label>Venue</label>
-      <input type="text" id="f-venue" placeholder="e.g. Old Trafford"/></div>
-    <div class="form-group"><label>Status</label>
+
+    <div class="form-group">
+      <label>Away Team</label>
+      <select id="f-away">${teamOptions}</select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Home Score</label>
+        <input type="number" id="f-hscore" value="0" min="0"/>
+      </div>
+      <div class="form-group">
+        <label>Away Score</label>
+        <input type="number" id="f-ascore" value="0" min="0"/>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Match Date</label>
+      <input type="date" id="f-date"/>
+    </div>
+
+    <div class="form-group">
+      <label>Venue</label>
+      <input type="text" id="f-venue" placeholder="e.g. Old Trafford"/>
+    </div>
+
+    <div class="form-group">
+      <label>Status</label>
       <select id="f-status">
         <option value="SCHEDULED">Scheduled</option>
         <option value="LIVE">Live</option>
         <option value="COMPLETED">Completed</option>
       </select>
     </div>
+
     <div class="form-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveMatch()">Save Match</button>
-    </div>`);
+    </div>
+  `);
 }
 
 async function saveMatch() {
   const body = {
-    homeTeam:  { id: +document.getElementById('f-home').value },
-    awayTeam:  { id: +document.getElementById('f-away').value },
+    homeTeam: { id: +document.getElementById('f-home').value },
+    awayTeam: { id: +document.getElementById('f-away').value },
     homeScore: +document.getElementById('f-hscore').value,
     awayScore: +document.getElementById('f-ascore').value,
-    matchDate:  document.getElementById('f-date').value,
-    venue:      document.getElementById('f-venue').value,
-    status:     document.getElementById('f-status').value
+    matchDate: document.getElementById('f-date').value,
+    venue: document.getElementById('f-venue').value,
+    status: document.getElementById('f-status').value
   };
-  await apiFetch(`${API}/matches`, { method: 'POST', body: JSON.stringify(body) });
+
+  await apiFetch(`${API}/matches`, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+
   closeModal();
   renderMatches();
 }
@@ -190,11 +237,13 @@ async function saveMatch() {
 // =============================================
 async function renderTeams() {
   const data = await apiFetch(`${API}/teams`);
+
   app().innerHTML = `
     <div class="section-header">
       <h2>🛡️ Teams</h2>
       <button class="btn btn-primary" onclick="showTeamForm()">+ Add Team</button>
     </div>
+
     <div class="grid">
       ${data.map(t => `
         <div class="card">
@@ -203,40 +252,54 @@ async function renderTeams() {
           <p>📅 Founded: ${t.foundedYear || '—'}</p>
           <div class="card-actions">
             <button class="btn btn-warning btn-sm"
-              onclick="showTeamForm(${t.id},'${t.name}','${t.city}',${t.foundedYear})">Edit</button>
-            <button class="btn btn-danger btn-sm"
-              onclick="deleteTeam(${t.id})">Delete</button>
+              onclick="showTeamForm(${t.id},'${t.name}','${t.city}',${t.foundedYear})">
+              Edit
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteTeam(${t.id})">
+              Delete
+            </button>
           </div>
-        </div>`).join('')}
+        </div>
+      `).join('')}
     </div>`;
 }
 
-function showTeamForm(id=null, name='', city='', foundedYear='') {
+function showTeamForm(id = null, name = '', city = '', foundedYear = '') {
   openModal(id ? 'Edit Team' : 'Add Team', `
-    <div class="form-group"><label>Team Name</label>
-      <input type="text" id="f-name" value="${name}"
-             placeholder="e.g. Manchester United"/></div>
-    <div class="form-group"><label>City</label>
-      <input type="text" id="f-city" value="${city}"
-             placeholder="e.g. Manchester"/></div>
-    <div class="form-group"><label>Founded Year</label>
-      <input type="number" id="f-year" value="${foundedYear}"
-             placeholder="e.g. 1878"/></div>
+    <div class="form-group">
+      <label>Team Name</label>
+      <input type="text" id="f-name" value="${name}" placeholder="e.g. Manchester United"/>
+    </div>
+
+    <div class="form-group">
+      <label>City</label>
+      <input type="text" id="f-city" value="${city}" placeholder="e.g. Manchester"/>
+    </div>
+
+    <div class="form-group">
+      <label>Founded Year</label>
+      <input type="number" id="f-year" value="${foundedYear}" placeholder="e.g. 1878"/>
+    </div>
+
     <div class="form-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveTeam(${id})">Save Team</button>
-    </div>`);
+    </div>
+  `);
 }
 
 async function saveTeam(id) {
   const body = {
-    name:        document.getElementById('f-name').value,
-    city:        document.getElementById('f-city').value,
+    name: document.getElementById('f-name').value,
+    city: document.getElementById('f-city').value,
     foundedYear: +document.getElementById('f-year').value
   };
-  const url    = id ? `${API}/teams/${id}` : `${API}/teams`;
+
+  const url = id ? `${API}/teams/${id}` : `${API}/teams`;
   const method = id ? 'PUT' : 'POST';
+
   await apiFetch(url, { method, body: JSON.stringify(body) });
+
   closeModal();
   renderTeams();
 }
@@ -252,11 +315,14 @@ async function deleteTeam(id) {
 // =============================================
 async function renderPlayers() {
   const data = await apiFetch(`${API}/players`);
+  allPlayers = data;
+
   app().innerHTML = `
     <div class="section-header">
       <h2>👤 Players</h2>
       <button class="btn btn-primary" onclick="showPlayerForm()">+ Add Player</button>
     </div>
+
     <div class="grid">
       ${data.map(p => `
         <div class="card player-card">
@@ -264,29 +330,50 @@ async function renderPlayers() {
             ${p.photoUrl
               ? `<img src="${p.photoUrl}" class="player-photo" alt="${p.name}"/>`
               : `<div class="player-photo-placeholder">
-                   ${p.name.charAt(0).toUpperCase()}
-                 </div>`}
+                  ${p.name.charAt(0).toUpperCase()}
+                </div>`
+            }
           </div>
+
           <h3>#${p.jerseyNumber} ${p.name}</h3>
           <p>🎽 ${p.position || '—'}</p>
           <p>🌍 ${p.nationality || '—'}</p>
           <p>🎂 Age: ${p.age || '—'}</p>
           <p>🛡️ ${p.team?.name || 'No Team'}</p>
+
           <div class="card-actions">
-            <button class="btn btn-warning btn-sm"
-              onclick="showPlayerForm(${p.id},'${p.name}','${p.position}',
-              ${p.jerseyNumber},'${p.nationality}',${p.age},
-              ${p.team?.id || null},'${p.photoUrl || ''}')">Edit</button>
-            <button class="btn btn-danger btn-sm"
-              onclick="deletePlayer(${p.id})">Delete</button>
+            <button class="btn btn-warning btn-sm" onclick="editPlayer(${p.id})">
+              Edit
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deletePlayer(${p.id})">
+              Delete
+            </button>
           </div>
-        </div>`).join('')}
+        </div>
+      `).join('')}
     </div>`;
 }
 
-function showPlayerForm(id=null, name='', position='',
-                        jersey=0, nationality='', age=0,
-                        teamId=null, photoUrl='') {
+function editPlayer(id) {
+  const p = allPlayers.find(x => x.id === id);
+  if (!p) return;
+
+  showPlayerForm(
+    p.id,
+    p.name,
+    p.position,
+    p.jerseyNumber,
+    p.nationality,
+    p.age,
+    p.team?.id || null,
+    p.photoUrl || ''
+  );
+}
+
+function showPlayerForm(id = null, name = '', position = '',
+  jersey = 0, nationality = '', age = 0,
+  teamId = null, photoUrl = '') {
+
   const teamOptions = allTeams.map(t =>
     `<option value="${t.id}" ${t.id === teamId ? 'selected' : ''}>${t.name}</option>`
   ).join('');
@@ -306,13 +393,15 @@ function showPlayerForm(id=null, name='', position='',
       <small style="color:var(--muted)">Player Photo</small>
     </div>
 
-    <!-- Photo Options -->
+    <!-- Photo URL -->
     <div class="form-group">
       <label>📷 Photo — Enter URL</label>
       <input type="text" id="f-photoUrl" value="${photoUrl}"
              placeholder="https://example.com/photo.jpg"
              oninput="previewPhotoUrl(this.value)"/>
     </div>
+
+    <!-- Upload Photo -->
     <div class="form-group">
       <label>📁 Or Upload from Device</label>
       <input type="file" id="f-photoFile" accept="image/*"
@@ -324,46 +413,62 @@ function showPlayerForm(id=null, name='', position='',
     <hr style="border-color:var(--border);margin:0.8rem 0"/>
 
     <div class="form-row">
-      <div class="form-group"><label>Full Name</label>
-        <input type="text" id="f-name" value="${name}"
-               placeholder="Player name"/></div>
-      <div class="form-group"><label>Jersey #</label>
-        <input type="number" id="f-jersey" value="${jersey}"
-               min="1" max="99"/></div>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="f-name" value="${name}" placeholder="Player name"/>
+      </div>
+      <div class="form-group">
+        <label>Jersey #</label>
+        <input type="number" id="f-jersey" value="${jersey}" min="1" max="99"/>
+      </div>
     </div>
+
     <div class="form-row">
-      <div class="form-group"><label>Position</label>
+      <div class="form-group">
+        <label>Position</label>
         <select id="f-pos">
           ${['Goalkeeper','Defender','Midfielder','Forward'].map(p =>
-            `<option ${p === position ? 'selected' : ''}>${p}</option>`).join('')}
+            `<option ${p === position ? 'selected' : ''}>${p}</option>`
+          ).join('')}
         </select>
       </div>
-      <div class="form-group"><label>Age</label>
-        <input type="number" id="f-age" value="${age}"
-               min="15" max="50"/></div>
+
+      <div class="form-group">
+        <label>Age</label>
+        <input type="number" id="f-age" value="${age}" min="15" max="50"/>
+      </div>
     </div>
-    <div class="form-group"><label>Nationality</label>
-      <input type="text" id="f-nat" value="${nationality}"
-             placeholder="e.g. English"/></div>
-    <div class="form-group"><label>Team</label>
+
+    <div class="form-group">
+      <label>Nationality</label>
+      <input type="text" id="f-nat" value="${nationality}" placeholder="e.g. English"/>
+    </div>
+
+    <div class="form-group">
+      <label>Team</label>
       <select id="f-team">
-        <option value="">-- No Team --</option>${teamOptions}
+        <option value="">-- No Team --</option>
+        ${teamOptions}
       </select>
     </div>
+
     <div class="form-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary"
-              onclick="savePlayer(${id})">Save Player</button>
-    </div>`);
+      <button class="btn btn-primary" onclick="savePlayer(${id})">Save Player</button>
+    </div>
+  `);
 }
 
 // Preview photo from URL
 function previewPhotoUrl(url) {
   const preview = document.getElementById('photoPreview');
+
   if (url) {
     preview.innerHTML =
       `<img src="${url}" style="width:100%;height:100%;object-fit:cover"
             onerror="this.parentElement.innerHTML='❌'"/>`;
+  } else {
+    preview.innerHTML = '👤';
   }
 }
 
@@ -371,6 +476,14 @@ function previewPhotoUrl(url) {
 function previewPhotoFile(input) {
   const file = input.files[0];
   if (!file) return;
+
+  // Max 1MB
+  if (file.size > 1024 * 1024) {
+    alert('⚠️ Image too large! Please use an image under 1MB.');
+    input.value = '';
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = (e) => {
     document.getElementById('photoPreview').innerHTML =
@@ -382,22 +495,31 @@ function previewPhotoFile(input) {
 }
 
 async function savePlayer(id) {
-  const teamId   = document.getElementById('f-team').value;
+  const teamId = document.getElementById('f-team').value;
   const photoUrl = document.getElementById('f-photoUrl').value;
+
+  console.log("Saving Photo URL length:", photoUrl?.length);
+
   const body = {
-    name:         document.getElementById('f-name').value,
+    name: document.getElementById('f-name').value,
     jerseyNumber: +document.getElementById('f-jersey').value,
-    position:     document.getElementById('f-pos').value,
-    age:          +document.getElementById('f-age').value,
-    nationality:  document.getElementById('f-nat').value,
-    photoUrl:     photoUrl || null,
-    team:         teamId ? { id: +teamId } : null
+    position: document.getElementById('f-pos').value,
+    age: +document.getElementById('f-age').value,
+    nationality: document.getElementById('f-nat').value,
+    photoUrl: photoUrl || null,
+    team: teamId ? { id: +teamId } : null
   };
-  const url    = id ? `${API}/players/${id}` : `${API}/players`;
+
+  const url = id ? `${API}/players/${id}` : `${API}/players`;
   const method = id ? 'PUT' : 'POST';
-  await apiFetch(url, { method, body: JSON.stringify(body) });
-  closeModal();
-  renderPlayers();
+
+  try {
+    await apiFetch(url, { method, body: JSON.stringify(body) });
+    closeModal();
+    renderPlayers();
+  } catch (err) {
+    alert('❌ Failed to save player: ' + err.message);
+  }
 }
 
 async function deletePlayer(id) {
@@ -409,11 +531,10 @@ async function deletePlayer(id) {
 // =============================================
 // STATS — Total + League Wise with Filter
 // =============================================
-let tournaments      = [];
-let selectedTournId  = 'all';
+let tournaments = [];
+let selectedTournId = 'all';
 
 async function renderStats() {
-  // Load tournaments for filter
   tournaments = await apiFetch(`${API}/tournaments`).catch(() => []);
 
   app().innerHTML = `
@@ -422,7 +543,6 @@ async function renderStats() {
       <button class="btn btn-primary" onclick="showStatsForm()">+ Add Stats</button>
     </div>
 
-    <!-- Filter Bar -->
     <div class="stats-filter-bar">
       <span class="stats-filter-label">Filter by:</span>
       <div class="stats-filter-tabs">
@@ -430,16 +550,17 @@ async function renderStats() {
           🌍 Total Stats
         </button>
         ${tournaments.map(t => `
-          <button class="stats-tab"
-                  onclick="filterStats('${t.id}', this)">
+          <button class="stats-tab" onclick="filterStats('${t.id}', this)">
             🏆 ${t.name}
-          </button>`).join('')}
+          </button>
+        `).join('')}
       </div>
     </div>
 
     <div id="stats-content">
       <div class="loader">⚽ Loading stats...</div>
-    </div>`;
+    </div>
+  `;
 
   filterStats('all', document.querySelector('.stats-tab.active'));
 }
@@ -469,19 +590,14 @@ async function renderTotalStats(content) {
   const map = {};
   stats.forEach(s => {
     const pid = s.player.id;
-    if (!map[pid]) map[pid] = {
-      player: s.player, goals: 0, assists: 0, yellows: 0, reds: 0
-    };
-    map[pid].goals   += s.goals;
+    if (!map[pid]) map[pid] = { player: s.player, goals: 0, assists: 0 };
+    map[pid].goals += s.goals;
     map[pid].assists += s.assists;
-    map[pid].yellows += s.yellowCards;
-    map[pid].reds    += s.redCards;
   });
 
-  const rows        = Object.values(map).sort((a, b) => b.goals - a.goals);
-  const totalGoals  = rows.reduce((a, r) => a + r.goals,   0);
+  const rows = Object.values(map).sort((a, b) => b.goals - a.goals);
+  const totalGoals = rows.reduce((a, r) => a + r.goals, 0);
   const totalAssist = rows.reduce((a, r) => a + r.assists, 0);
-  const totalYellow = rows.reduce((a, r) => a + r.yellows, 0);
 
   content.innerHTML = `
     <div class="stats-summary">
@@ -497,24 +613,20 @@ async function renderTotalStats(content) {
         <div class="stat-value">${totalAssist}</div>
         <div class="stat-label">Total Assists</div>
       </div>
-      <div class="stat-box">
-        <div class="stat-value">${totalYellow}</div>
-        <div class="stat-label">Yellow Cards</div>
-      </div>
     </div>
+
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
             <th>#</th><th>Player</th><th>Team</th>
             <th>⚽ Goals</th><th>🅰️ Assists</th>
-            <th>🟨 Yellow</th><th>🟥 Red</th>
           </tr>
         </thead>
         <tbody>
           ${rows.map((r, i) => `
             <tr>
-              <td>${i+1}</td>
+              <td>${i + 1}</td>
               <td>
                 <div style="display:flex;align-items:center;gap:0.6rem">
                   ${r.player.photoUrl
@@ -525,19 +637,20 @@ async function renderTotalStats(content) {
                                   align-items:center;justify-content:center;
                                   font-size:0.75rem;font-weight:700;color:var(--accent)">
                          ${r.player.name.charAt(0)}
-                       </div>`}
+                       </div>`
+                  }
                   <strong>${r.player.name}</strong>
                 </div>
               </td>
               <td>${r.player.team?.name || '—'}</td>
               <td style="color:var(--accent);font-weight:700">${r.goals}</td>
               <td>${r.assists}</td>
-              <td style="color:var(--warning)">${r.yellows}</td>
-              <td style="color:var(--danger)">${r.reds}</td>
-            </tr>`).join('')}
+            </tr>
+          `).join('')}
         </tbody>
       </table>
-    </div>`;
+    </div>
+  `;
 }
 
 // ---- Tournament / League Stats ----
@@ -553,8 +666,8 @@ async function renderTournamentStats(tournId, content) {
     return;
   }
 
-  const topGoals   = [...data].sort((a,b) => b.goals   - a.goals).slice(0,3);
-  const topAssists = [...data].sort((a,b) => b.assists - a.assists).slice(0,3);
+  const topGoals = [...data].sort((a, b) => b.goals - a.goals).slice(0, 3);
+  const topAssists = [...data].sort((a, b) => b.assists - a.assists).slice(0, 3);
 
   content.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem">
@@ -562,7 +675,7 @@ async function renderTournamentStats(tournId, content) {
         <h3 style="color:var(--accent);margin-bottom:0.8rem;font-size:1rem">
           ⚽ Top Scorers
         </h3>
-        ${topGoals.map((p,i) => `
+        ${topGoals.map((p, i) => `
           <div style="display:flex;align-items:center;gap:0.8rem;
                background:var(--surface);border-radius:8px;
                padding:0.7rem 1rem;margin-bottom:0.5rem;
@@ -575,13 +688,15 @@ async function renderTournamentStats(tournId, content) {
             <span style="font-size:1.3rem;font-weight:800;color:var(--accent)">
               ${p.goals}
             </span>
-          </div>`).join('')}
+          </div>
+        `).join('')}
       </div>
+
       <div>
         <h3 style="color:#42a5f5;margin-bottom:0.8rem;font-size:1rem">
           🅰️ Top Assists
         </h3>
-        ${topAssists.map((p,i) => `
+        ${topAssists.map((p, i) => `
           <div style="display:flex;align-items:center;gap:0.8rem;
                background:var(--surface);border-radius:8px;
                padding:0.7rem 1rem;margin-bottom:0.5rem;
@@ -594,7 +709,8 @@ async function renderTournamentStats(tournId, content) {
             <span style="font-size:1.3rem;font-weight:800;color:#42a5f5">
               ${p.assists}
             </span>
-          </div>`).join('')}
+          </div>
+        `).join('')}
       </div>
     </div>
 
@@ -607,17 +723,19 @@ async function renderTournamentStats(tournId, content) {
           </tr>
         </thead>
         <tbody>
-          ${data.map((p,i) => `
+          ${data.map((p, i) => `
             <tr>
-              <td>${i+1}</td>
+              <td>${i + 1}</td>
               <td><strong>${p.playerName}</strong></td>
               <td>${p.teamName}</td>
               <td style="color:var(--accent);font-weight:700">${p.goals}</td>
               <td style="color:#42a5f5">${p.assists}</td>
-            </tr>`).join('')}
+            </tr>
+          `).join('')}
         </tbody>
       </table>
-    </div>`;
+    </div>
+  `;
 }
 
 async function showStatsForm() {
@@ -625,45 +743,57 @@ async function showStatsForm() {
     apiFetch(`${API}/players`),
     apiFetch(`${API}/matches`)
   ]);
+
   const playerOpts = players.map(p =>
     `<option value="${p.id}">${p.name}</option>`).join('');
-  const matchOpts  = matches.map(m =>
-    `<option value="${m.id}">${m.homeTeam.name} vs ${m.awayTeam.name}
-     (${m.matchDate || 'TBD'})</option>`).join('');
+
+  const matchOpts = matches.map(m =>
+    `<option value="${m.id}">
+      ${m.homeTeam.name} vs ${m.awayTeam.name} (${m.matchDate || 'TBD'})
+    </option>`).join('');
 
   openModal('Add Player Stats', `
-    <div class="form-group"><label>Player</label>
-      <select id="f-player">${playerOpts}</select></div>
-    <div class="form-group"><label>Match</label>
-      <select id="f-match">${matchOpts}</select></div>
-    <div class="form-row">
-      <div class="form-group"><label>Goals</label>
-        <input type="number" id="f-goals" value="0" min="0"/></div>
-      <div class="form-group"><label>Assists</label>
-        <input type="number" id="f-assists" value="0" min="0"/></div>
+    <div class="form-group">
+      <label>Player</label>
+      <select id="f-player">${playerOpts}</select>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Yellow Cards</label>
-        <input type="number" id="f-yellow" value="0" min="0" max="2"/></div>
-      <div class="form-group"><label>Red Cards</label>
-        <input type="number" id="f-red" value="0" min="0" max="1"/></div>
+
+    <div class="form-group">
+      <label>Match</label>
+      <select id="f-match">${matchOpts}</select>
     </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Goals</label>
+        <input type="number" id="f-goals" value="0" min="0"/>
+      </div>
+      <div class="form-group">
+        <label>Assists</label>
+        <input type="number" id="f-assists" value="0" min="0"/>
+      </div>
+    </div>
+
     <div class="form-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveStats()">Save Stats</button>
-    </div>`);
+    </div>
+  `);
 }
 
 async function saveStats() {
   const body = {
-    player:      { id: +document.getElementById('f-player').value },
-    match:       { id: +document.getElementById('f-match').value },
-    goals:        +document.getElementById('f-goals').value,
-    assists:      +document.getElementById('f-assists').value,
-    yellowCards:  +document.getElementById('f-yellow').value,
-    redCards:     +document.getElementById('f-red').value
+    player: { id: +document.getElementById('f-player').value },
+    match: { id: +document.getElementById('f-match').value },
+    goals: +document.getElementById('f-goals').value,
+    assists: +document.getElementById('f-assists').value
   };
-  await apiFetch(`${API}/stats`, { method: 'POST', body: JSON.stringify(body) });
+
+  await apiFetch(`${API}/stats`, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+
   closeModal();
   renderStats();
 }

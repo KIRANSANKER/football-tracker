@@ -18,7 +18,7 @@ public class Player {
     private String nationality;
     private int age;
 
-    @Column(length = 500)
+    @Column(columnDefinition = "MEDIUMTEXT")
     private String photoUrl;
 
     @ManyToOne(fetch = FetchType.EAGER)
