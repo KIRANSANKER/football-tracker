@@ -1,56 +1,157 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="arctic">
+<html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>⚽ Football Tracker</title>
-  <link rel="stylesheet" href="style.css"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Football Tracker | Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="login.css">
 </head>
 <body>
 
-  <!-- Navbar -->
-  <nav class="navbar">
-    <div class="nav-brand">⚽ Football Tracker</div>
-    <div class="nav-right">
-      <ul class="nav-links">
-        <li class="nav-item active" onclick="loadSection('standings', this)">🏆 Standings</li>
-        <li class="nav-item" onclick="loadSection('matches', this)">📅 Matches</li>
-        <li class="nav-item" onclick="loadSection('teams', this)">🛡️ Teams</li>
-        <li class="nav-item" onclick="loadSection('players', this)">👤 Players</li>
-        <li class="nav-item" onclick="loadSection('stats', this)">📊 Stats</li>
-        <li class="nav-item" onclick="window.location.href='tournament.html'">🏆 Tournaments</li>
-      </ul>
-
-      <!-- 2-THEME SWITCHER: Arctic & Galaxy -->
-      <div class="theme-switcher">
-        <span class="theme-label">Theme</span>
-        <div class="theme-dots">
-          <div class="theme-dot dot-arctic active" title="☀️ Arctic" onclick="setTheme('arctic', this)"></div>
-          <div class="theme-dot dot-galaxy"         title="🔮 Galaxy" onclick="setTheme('galaxy', this)"></div>
+  <div class="split-layout">
+    
+    <!-- LEFT: Visual/Animated Panel -->
+    <div class="panel-left">
+      <div class="pitch-bg">
+        <div class="pitch-center-circle"></div>
+        <div class="pitch-half-line"></div>
+      </div>
+      
+      <!-- Bouncing Mascot -->
+      <div class="mascot-scene">
+        <div class="mascot">
+          <div class="mascot-eyes">
+            <div class="eye"></div>
+            <div class="eye"></div>
+          </div>
+          <div class="mascot-mouth"></div>
         </div>
-        <span class="theme-name" id="themeName">☀️ Arctic</span>
+        <div class="shadow"></div>
+      </div>
+
+      <div class="brand">
+        <span class="icon">⚽</span>
+        <div class="text">
+          <h1>Football Tracker</h1>
+          <p>Your Ultimate League Dashboard</p>
+        </div>
       </div>
     </div>
-  </nav>
 
-  <!-- Main Content -->
-  <main id="app" class="container">
-    <div class="loader">⚽ Loading...</div>
-  </main>
+    <!-- RIGHT: Form Panel -->
+    <div class="panel-right">
+      <div class="form-container">
+        
+        <div class="view-header">
+          <h2 id="viewTitle">Welcome Back 👋</h2>
+          <p id="viewSubtitle">Sign in to continue your journey</p>
+        </div>
 
-  <!-- Modal -->
-  <div id="modal-overlay" class="modal-overlay hidden">
-    <div class="modal">
-      <div class="modal-header">
-        <h3 id="modal-title">Form</h3>
-        <button class="modal-close" onclick="closeModal()">✕</button>
+        <div class="tabs">
+          <button class="tab-btn active" id="tabSignin" onclick="switchView('signin')">Sign In</button>
+          <button class="tab-btn" id="tabSignup" onclick="switchView('signup')">Sign Up</button>
+          <div class="tab-slider" id="tabSlider"></div>
+        </div>
+
+        <!-- SIGN IN -->
+        <form class="auth-box active" id="viewSignin" onsubmit="handleSignin(event)" novalidate>
+          <div class="input-group">
+            <span class="icon">📧</span>
+            <input type="email" id="siEmail" placeholder="Email Address" required>
+          </div>
+          
+          <div class="input-group">
+            <span class="icon">🔒</span>
+            <input type="password" id="siPw" placeholder="Password" required>
+            <button type="button" class="toggle-pw" onclick="togglePw('siPw', this)">👁️</button>
+          </div>
+
+          <div class="options">
+            <label class="checkbox-wrap">
+              <input type="checkbox">
+              <span class="box"></span>
+              Remember me
+            </label>
+            <button type="button" class="text-link" onclick="switchView('forgot')">Forgot password?</button>
+          </div>
+
+          <button type="submit" class="primary-btn" id="btnSignin">
+            <span class="txt">Sign In</span>
+            <span class="spinner hidden"></span>
+          </button>
+
+          <div class="divider"><span>or</span></div>
+
+          <button type="button" class="google-btn">
+            <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.3 35.3 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8H6.3C9.7 35.7 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.3 5.6l6.2 5.2C41.1 36.1 44 30.6 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
+            Continue with Google
+          </button>
+        </form>
+
+        <!-- SIGN UP -->
+        <form class="auth-box" id="viewSignup" onsubmit="handleSignup(event)" novalidate>
+          <div class="row">
+            <div class="input-group">
+              <span class="icon">👤</span>
+              <input type="text" id="suFirst" placeholder="First Name" required>
+            </div>
+            <div class="input-group">
+              <input type="text" id="suLast" placeholder="Last Name" required>
+            </div>
+          </div>
+          
+          <div class="input-group">
+            <span class="icon">📧</span>
+            <input type="email" id="suEmail" placeholder="Email Address" required>
+          </div>
+          
+          <div class="input-group">
+            <span class="icon">🔒</span>
+            <input type="password" id="suPw" placeholder="Create Password" required oninput="checkStrength(this.value)">
+            <button type="button" class="toggle-pw" onclick="togglePw('suPw', this)">👁️</button>
+          </div>
+          
+          <div class="strength-meter">
+            <div class="bar-bg"><div class="bar-fill" id="pwFill"></div></div>
+            <span class="label" id="pwLabel"></span>
+          </div>
+
+          <div class="input-group" style="margin-top: 0.5rem;">
+            <span class="icon">🔐</span>
+            <input type="password" id="suConf" placeholder="Confirm Password" required>
+            <button type="button" class="toggle-pw" onclick="togglePw('suConf', this)">👁️</button>
+          </div>
+
+          <button type="submit" class="primary-btn" id="btnSignup" style="margin-top: 1rem;">
+            <span class="txt">Create Account</span>
+            <span class="spinner hidden"></span>
+          </button>
+        </form>
+
+        <!-- FORGOT PW -->
+        <form class="auth-box" id="viewForgot" onsubmit="handleForgot(event)" novalidate>
+          <div class="input-group">
+            <span class="icon">📧</span>
+            <input type="email" id="fpEmail" placeholder="Registered Email" required>
+          </div>
+          
+          <button type="submit" class="primary-btn" id="btnForgot" style="margin-top: 1rem;">
+            <span class="txt">Send Reset Link</span>
+            <span class="spinner hidden"></span>
+          </button>
+          
+          <button type="button" class="text-link center" style="margin-top: 1.5rem;" onclick="switchView('signin')">← Back to Log In</button>
+        </form>
+
       </div>
-      <div id="modal-body" class="modal-body"></div>
     </div>
   </div>
-  
 
+  <div id="toast" class="toast"></div>
 
-  <script src="app.js"></script>
+  <script src="login.js"></script>
 </body>
 </html>

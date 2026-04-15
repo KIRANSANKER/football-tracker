@@ -1,4 +1,7 @@
 'use strict';
+const API = window.location.hostname === "localhost"
+  ? "http://localhost:8080/api"
+  : "/api";
 
 const views = ['signin', 'signup', 'forgot'];
 const texts = {
@@ -98,7 +101,7 @@ async function handleSignin(e) {
 
   try {
     // API Call to your Spring Boot Backend
-    const response = await fetch('http://localhost:8080/api/auth/signin', {
+   const response = await fetch(`${API}/auth/signin`,  {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email, password: pw })
@@ -107,7 +110,7 @@ async function handleSignin(e) {
     if (response.ok) {
       showToast('⚽ Successfully signed in!');
       setTimeout(() => {
-        window.location.href = 'index.html';
+      window.location.href = 'dashboard.html';
       }, 1500);
     } else {
       const errorMsg = await response.text();
@@ -150,7 +153,7 @@ async function handleSignup(e) {
 
   try {
     // API Call to your Spring Boot Backend
-    const response = await fetch('http://localhost:8080/api/auth/signup', {
+   const response = await fetch(`${API}/auth/signup`,  {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -186,3 +189,4 @@ function handleForgot(e) {
     setTimeout(() => switchView('signin'), 2000);
   });
 }
+
