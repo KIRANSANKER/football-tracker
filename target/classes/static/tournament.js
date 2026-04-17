@@ -2,13 +2,19 @@
 // Football Tracker - tournament.js
 // Updated: Auto time, Edit goal, Own Goal,
 //          No description, Simplified standings
+//          + Role Based Access Control
 // =============================================
 
-const API = 'http://localhost:8080/api';
+const API = window.location.hostname === "localhost"
+  ? "http://localhost:8080/api"
+  : "/api";
+
+const isAdmin = () => localStorage.getItem('role') === 'ADMIN';
+
 let currentTournamentId = null;
-let currentTab          = 'matches';
-let allTeams            = [];
-let allPlayers          = [];
+let currentTab = 'matches';
+let allTeams = [];
+let allPlayers = [];
 
 // =============================================
 // THEME SWITCHER
@@ -35,9 +41,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.theme-dot').forEach(d => d.classList.remove('active'));
     dot.classList.add('active');
   }
-  allTeams   = await apiFetch(`${API}/teams`).catch(() => []);
+
+  allTeams = await apiFetch(`${API}/teams`).catch(() => []);
   allPlayers = await apiFetch(`${API}/players`).catch(() => []);
   loadTournaments();
+
+  // Hide edit/delete tournament buttons for USER
+  if (!isAdmin()) {
+    document.getElementById("btn-edit-tournament").style.display = "none";
+    document.getElementById("btn-delete-tournament").style.display = "none";
+  }
 });
 
 // =============================================
@@ -45,9 +58,19 @@ window.addEventListener('DOMContentLoaded', async () => {
 // =============================================
 async function apiFetch(url, options = {}) {
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' }, ...options
+    headers: { 'Content-Type': 'application/json' },
+    ...options
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const text = await res.text();
+      if (text) msg += ` - ${text}`;
+    } catch {}
+    throw new Error(msg);
+  }
+
   return options.method === 'DELETE' ? null : res.json();
 }
 
@@ -59,9 +82,11 @@ function openModal(title, bodyHTML) {
   document.getElementById('modal-body').innerHTML = bodyHTML;
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
+
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
 }
+
 document.getElementById('modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 });
@@ -96,7 +121,8 @@ function switchTab(tab, el) {
 async function loadTournaments() {
   document.getElementById('tournament-list').innerHTML =
     `<div class="loader">⚽ Loading tournaments...</div>`;
-  const data   = await apiFetch(`${API}/tournaments`).catch(() => []);
+
+  const data = await apiFetch(`${API}/tournaments`).catch(() => []);
   const filter = document.getElementById('filterStatus').value;
   const filtered = filter ? data.filter(t => t.status === filter) : data;
 
@@ -105,8 +131,10 @@ async function loadTournaments() {
       <div class="empty-state" style="grid-column:1/-1">
         <div class="icon">🏆</div>
         <p>No tournaments found.</p>
+        ${isAdmin() ? `
         <button class="btn btn-primary" style="margin-top:1rem"
           onclick="showTournamentForm()">+ Create First Tournament</button>
+        ` : ""}
       </div>`;
     return;
   }
@@ -157,8 +185,11 @@ async function loadTournamentDetail(id) {
       <span class="info-value">🏁 ${t.endDate || '—'}</span>
     </div>`;
 
-  document.getElementById('btn-edit-tournament').onclick   = () => showTournamentForm(t);
-  document.getElementById('btn-delete-tournament').onclick = () => deleteTournament(id);
+  if (isAdmin()) {
+    document.getElementById('btn-edit-tournament').onclick = () => showTournamentForm(t);
+    document.getElementById('btn-delete-tournament').onclick = () => deleteTournament(id);
+  }
+
   loadTabContent(currentTab);
 }
 
@@ -168,37 +199,42 @@ async function loadTournamentDetail(id) {
 async function loadTabContent(tab) {
   const content = document.getElementById('tab-content');
   content.innerHTML = `<div class="loader">⚽ Loading...</div>`;
+
   switch (tab) {
-    case 'matches':   return loadMatchesTab(content);
-    case 'teams':     return loadTeamsTab(content);
+    case 'matches': return loadMatchesTab(content);
+    case 'teams': return loadTeamsTab(content);
     case 'standings': return loadStandingsTab(content);
-    case 'stats':     return loadStatsTab(content);
+    case 'stats': return loadStatsTab(content);
   }
 }
 
 // ---- MATCHES TAB ----
 async function loadMatchesTab(content) {
   const matches = await apiFetch(`${API}/tournaments/${currentTournamentId}/matches`);
-  const upcoming  = matches.filter(m => m.status === 'UPCOMING');
-  const ongoing   = matches.filter(m => m.status === 'ONGOING');
+  const upcoming = matches.filter(m => m.status === 'UPCOMING');
+  const ongoing = matches.filter(m => m.status === 'ONGOING');
   const completed = matches.filter(m => m.status === 'COMPLETED');
 
   content.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
-      <button class="btn btn-primary" onclick="showMatchForm()">+ Add Match</button>
+      ${isAdmin() ? `<button class="btn btn-primary" onclick="showMatchForm()">+ Add Match</button>` : ''}
     </div>
+
     ${ongoing.length > 0 ? `
       <h3 style="color:var(--accent);margin-bottom:0.8rem;font-size:1rem">
         🔴 Ongoing (${ongoing.length})</h3>
       ${ongoing.map(m => matchCard(m)).join('')}` : ''}
+
     ${upcoming.length > 0 ? `
       <h3 style="color:#42a5f5;margin-bottom:0.8rem;font-size:1rem;margin-top:1rem">
         📅 Upcoming (${upcoming.length})</h3>
       ${upcoming.map(m => matchCard(m)).join('')}` : ''}
+
     ${completed.length > 0 ? `
       <h3 style="color:var(--muted);margin-bottom:0.8rem;font-size:1rem;margin-top:1rem">
         ✅ Completed (${completed.length})</h3>
       ${completed.map(m => matchCard(m)).join('')}` : ''}
+
     ${matches.length === 0 ? `
       <div class="empty-state">
         <div class="icon">📅</div><p>No matches scheduled yet.</p>
@@ -215,6 +251,7 @@ function matchCard(m) {
           📅 ${m.matchDate || 'TBD'} &nbsp;⏰ ${m.matchTime || 'TBD'}
         </span>
       </div>
+
       <div class="t-match-scoreline">
         <div class="t-team-block">
           <div class="t-team-name">${m.homeTeam.name}</div>
@@ -224,9 +261,12 @@ function matchCard(m) {
           <div class="t-team-name">${m.awayTeam.name}</div>
         </div>
       </div>
+
       <div class="t-match-footer">
         <span class="t-match-venue">📍 ${m.venue || '—'}</span>
+
         <div class="t-match-actions">
+          ${isAdmin() ? `
           <button class="btn btn-primary btn-sm"
             onclick="showAddEventForm(${m.id},'${m.homeTeam.name}',
             '${m.awayTeam.name}',${m.homeTeam.id},${m.awayTeam.id})">
@@ -236,12 +276,13 @@ function matchCard(m) {
             onclick="showMatchForm(${JSON.stringify(m).replace(/"/g,'&quot;')})">
             Edit
           </button>
+          <button class="btn btn-danger btn-sm"
+            onclick="deleteMatch(${m.id})">Del</button>` : ''}
+
           <button class="btn btn-sm" style="background:var(--surface2)"
             onclick="showMatchEvents(${m.id})">
             Events
           </button>
-          <button class="btn btn-danger btn-sm"
-            onclick="deleteMatch(${m.id})">Del</button>
         </div>
       </div>
     </div>`;
@@ -249,14 +290,15 @@ function matchCard(m) {
 
 // ---- TEAMS TAB ----
 async function loadTeamsTab(content) {
-  const tTeams  = await apiFetch(`${API}/tournaments/${currentTournamentId}/teams`);
+  const tTeams = await apiFetch(`${API}/tournaments/${currentTournamentId}/teams`);
   const teamIds = tTeams.map(tt => tt.team.id);
   const available = allTeams.filter(t => !teamIds.includes(t.id));
 
   content.innerHTML = `
     <div class="teams-tab-header">
       <h3 style="color:var(--accent)">Teams (${tTeams.length})</h3>
-      ${available.length > 0 ? `
+
+      ${isAdmin() && available.length > 0 ? `
         <div style="display:flex;gap:0.6rem;align-items:center">
           <select id="addTeamSelect" class="filter-select">
             ${available.map(t =>
@@ -264,8 +306,9 @@ async function loadTeamsTab(content) {
           </select>
           <button class="btn btn-primary btn-sm"
             onclick="addTeamToTournament()">+ Add Team</button>
-        </div>` : '<span style="color:var(--muted);font-size:0.85rem">All teams added</span>'}
+        </div>` : (!isAdmin() ? '' : '<span style="color:var(--muted);font-size:0.85rem">All teams added</span>')}
     </div>
+
     ${tTeams.length === 0
       ? `<div class="empty-state"><div class="icon">🛡️</div>
          <p>No teams added yet.</p></div>`
@@ -281,16 +324,17 @@ async function loadTeamsTab(content) {
               onclick="showTeamPlayers(${tt.team.id},'${tt.team.name}')">
               👤 Players
             </button>
+
+            ${isAdmin() ? `
             <button class="btn btn-danger btn-sm"
-              onclick="removeTeam(${tt.team.id})">Remove</button>
+              onclick="removeTeam(${tt.team.id})">Remove</button>` : ''}
           </div>
         </div>`).join('')}`;
 }
 
-// ---- STANDINGS TAB — Simplified (P W D L Pts) ----
+// ---- STANDINGS TAB ----
 async function loadStandingsTab(content) {
-  const data = await apiFetch(
-    `${API}/tournaments/${currentTournamentId}/standings`);
+  const data = await apiFetch(`${API}/tournaments/${currentTournamentId}/standings`);
 
   if (data.length === 0) {
     content.innerHTML = `
@@ -303,6 +347,7 @@ async function loadStandingsTab(content) {
     <div class="standings-note">
       📌 Only COMPLETED matches are counted in standings.
     </div>
+
     <div class="table-wrap">
       <table>
         <thead>
@@ -334,8 +379,7 @@ async function loadStandingsTab(content) {
 
 // ---- STATS TAB ----
 async function loadStatsTab(content) {
-  const data = await apiFetch(
-    `${API}/tournaments/${currentTournamentId}/stats`);
+  const data = await apiFetch(`${API}/tournaments/${currentTournamentId}/stats`);
 
   if (data.length === 0) {
     content.innerHTML = `
@@ -344,15 +388,15 @@ async function loadStatsTab(content) {
     return;
   }
 
-  const topGoals   = [...data].sort((a,b) => b.goals - a.goals).slice(0, 3);
-  const topAssists = [...data].sort((a,b) => b.assists - a.assists).slice(0, 3);
+  const topGoals = [...data].sort((a, b) => b.goals - a.goals).slice(0, 3);
+  const topAssists = [...data].sort((a, b) => b.assists - a.assists).slice(0, 3);
 
   content.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem">
       <div>
         <h3 style="color:var(--accent);margin-bottom:0.8rem;font-size:1rem">
           ⚽ Top Scorers</h3>
-        ${topGoals.map((p,i) => `
+        ${topGoals.map((p, i) => `
           <div style="display:flex;align-items:center;gap:0.8rem;
                background:var(--surface);border-radius:8px;padding:0.7rem 1rem;
                margin-bottom:0.5rem;border:1px solid var(--border)">
@@ -366,10 +410,11 @@ async function loadStatsTab(content) {
             </span>
           </div>`).join('')}
       </div>
+
       <div>
         <h3 style="color:#42a5f5;margin-bottom:0.8rem;font-size:1rem">
           🅰️ Top Assists</h3>
-        ${topAssists.map((p,i) => `
+        ${topAssists.map((p, i) => `
           <div style="display:flex;align-items:center;gap:0.8rem;
                background:var(--surface);border-radius:8px;padding:0.7rem 1rem;
                margin-bottom:0.5rem;border:1px solid var(--border)">
@@ -384,6 +429,7 @@ async function loadStatsTab(content) {
           </div>`).join('')}
       </div>
     </div>
+
     <div class="table-wrap">
       <table>
         <thead>
@@ -393,9 +439,9 @@ async function loadStatsTab(content) {
           </tr>
         </thead>
         <tbody>
-          ${data.map((p,i) => `
+          ${data.map((p, i) => `
             <tr>
-              <td>${i+1}</td>
+              <td>${i + 1}</td>
               <td><strong>${p.playerName}</strong></td>
               <td>${p.teamName}</td>
               <td style="color:var(--accent);font-weight:700">${p.goals}</td>
@@ -407,29 +453,35 @@ async function loadStatsTab(content) {
 }
 
 // =============================================
-// TOURNAMENT FORM — No description field
+// TOURNAMENT FORM
 // =============================================
 function showTournamentForm(t = null) {
+  if (!isAdmin()) return alert("Access denied");
+
   openModal(t ? 'Edit Tournament' : 'New Tournament', `
     <div class="form-group"><label>Tournament Name</label>
       <input type="text" id="f-name" value="${t?.name || ''}"
              placeholder="e.g. Premier League 2024"/></div>
+
     <div class="form-group"><label>Location</label>
       <input type="text" id="f-location" value="${t?.location || ''}"
              placeholder="e.g. England"/></div>
+
     <div class="form-row">
       <div class="form-group"><label>Start Date</label>
         <input type="date" id="f-start" value="${t?.startDate || ''}"/></div>
       <div class="form-group"><label>End Date</label>
         <input type="date" id="f-end" value="${t?.endDate || ''}"/></div>
     </div>
+
     <div class="form-group"><label>Status</label>
       <select id="f-status">
-        <option value="UPCOMING"  ${t?.status==='UPCOMING' ?'selected':''}>📅 Upcoming</option>
-        <option value="ONGOING"   ${t?.status==='ONGOING'  ?'selected':''}>🔴 Ongoing</option>
-        <option value="COMPLETED" ${t?.status==='COMPLETED'?'selected':''}>✅ Completed</option>
+        <option value="UPCOMING"  ${t?.status === 'UPCOMING' ? 'selected' : ''}>📅 Upcoming</option>
+        <option value="ONGOING"   ${t?.status === 'ONGOING' ? 'selected' : ''}>🔴 Ongoing</option>
+        <option value="COMPLETED" ${t?.status === 'COMPLETED' ? 'selected' : ''}>✅ Completed</option>
       </select>
     </div>
+
     <div class="form-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveTournament(${t?.id || null})">
@@ -439,22 +491,29 @@ function showTournamentForm(t = null) {
 }
 
 async function saveTournament(id) {
+  if (!isAdmin()) return alert("Access denied");
+
   const body = {
-    name:      document.getElementById('f-name').value,
-    location:  document.getElementById('f-location').value,
+    name: document.getElementById('f-name').value,
+    location: document.getElementById('f-location').value,
     startDate: document.getElementById('f-start').value || null,
-    endDate:   document.getElementById('f-end').value   || null,
-    status:    document.getElementById('f-status').value
+    endDate: document.getElementById('f-end').value || null,
+    status: document.getElementById('f-status').value
   };
-  const url    = id ? `${API}/tournaments/${id}` : `${API}/tournaments`;
+
+  const url = id ? `${API}/tournaments/${id}` : `${API}/tournaments`;
   const method = id ? 'PUT' : 'POST';
+
   await apiFetch(url, { method, body: JSON.stringify(body) });
+
   closeModal();
   if (id) loadTournamentDetail(id);
-  else    loadTournaments();
+  else loadTournaments();
 }
 
 async function deleteTournament(id) {
+  if (!isAdmin()) return alert("Access denied");
+
   if (!confirm('Delete this tournament and all its matches?')) return;
   await apiFetch(`${API}/tournaments/${id}`, { method: 'DELETE' });
   showListView();
@@ -464,61 +523,74 @@ async function deleteTournament(id) {
 // MATCH FORM
 // =============================================
 function showMatchForm(m = null) {
+  if (!isAdmin()) return alert("Access denied");
+
   const teamOpts = allTeams.map(t =>
     `<option value="${t.id}"
-      ${m && m.homeTeam?.id===t.id?'selected':''}>${t.name}</option>`).join('');
+      ${m && m.homeTeam?.id === t.id ? 'selected' : ''}>${t.name}</option>`).join('');
+
   const awayOpts = allTeams.map(t =>
     `<option value="${t.id}"
-      ${m && m.awayTeam?.id===t.id?'selected':''}>${t.name}</option>`).join('');
+      ${m && m.awayTeam?.id === t.id ? 'selected' : ''}>${t.name}</option>`).join('');
 
   openModal(m ? 'Edit Match' : 'Add Match', `
     <div class="form-group"><label>Round</label>
-      <input type="text" id="f-round" value="${m?.round||''}"
+      <input type="text" id="f-round" value="${m?.round || ''}"
              placeholder="e.g. Matchday 1, Quarter Final"/></div>
+
     <div class="form-group"><label>Home Team</label>
       <select id="f-home">${teamOpts}</select></div>
+
     <div class="form-group"><label>Away Team</label>
       <select id="f-away">${awayOpts}</select></div>
+
     <div class="form-row">
       <div class="form-group"><label>Home Score</label>
-        <input type="number" id="f-hs" value="${m?.homeScore||0}" min="0"/></div>
+        <input type="number" id="f-hs" value="${m?.homeScore || 0}" min="0"/></div>
       <div class="form-group"><label>Away Score</label>
-        <input type="number" id="f-as" value="${m?.awayScore||0}" min="0"/></div>
+        <input type="number" id="f-as" value="${m?.awayScore || 0}" min="0"/></div>
     </div>
+
     <div class="form-row">
       <div class="form-group"><label>Match Date</label>
-        <input type="date" id="f-date" value="${m?.matchDate||''}"/></div>
+        <input type="date" id="f-date" value="${m?.matchDate || ''}"/></div>
       <div class="form-group"><label>Match Time</label>
-        <input type="time" id="f-time" value="${m?.matchTime||''}"/></div>
+        <input type="time" id="f-time" value="${m?.matchTime || ''}"/></div>
     </div>
+
     <div class="form-group"><label>Venue</label>
-      <input type="text" id="f-venue" value="${m?.venue||''}"
+      <input type="text" id="f-venue" value="${m?.venue || ''}"
              placeholder="e.g. Old Trafford"/></div>
+
     <div class="form-group"><label>Status</label>
       <select id="f-status">
-        <option value="UPCOMING"  ${m?.status==='UPCOMING' ?'selected':''}>📅 Upcoming</option>
-        <option value="ONGOING"   ${m?.status==='ONGOING'  ?'selected':''}>🔴 Ongoing</option>
-        <option value="COMPLETED" ${m?.status==='COMPLETED'?'selected':''}>✅ Completed</option>
+        <option value="UPCOMING"  ${m?.status === 'UPCOMING' ? 'selected' : ''}>📅 Upcoming</option>
+        <option value="ONGOING"   ${m?.status === 'ONGOING' ? 'selected' : ''}>🔴 Ongoing</option>
+        <option value="COMPLETED" ${m?.status === 'COMPLETED' ? 'selected' : ''}>✅ Completed</option>
       </select>
     </div>
+
     <div class="form-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveMatch(${m?.id||null})">Save Match</button>
+      <button class="btn btn-primary" onclick="saveMatch(${m?.id || null})">Save Match</button>
     </div>`);
 }
 
 async function saveMatch(id) {
+  if (!isAdmin()) return alert("Access denied");
+
   const body = {
-    homeTeam:  { id: +document.getElementById('f-home').value },
-    awayTeam:  { id: +document.getElementById('f-away').value },
+    homeTeam: { id: +document.getElementById('f-home').value },
+    awayTeam: { id: +document.getElementById('f-away').value },
     homeScore: +document.getElementById('f-hs').value,
     awayScore: +document.getElementById('f-as').value,
-    matchDate:  document.getElementById('f-date').value || null,
-    matchTime:  document.getElementById('f-time').value || null,
-    venue:      document.getElementById('f-venue').value,
-    status:     document.getElementById('f-status').value,
-    round:      document.getElementById('f-round').value
+    matchDate: document.getElementById('f-date').value || null,
+    matchTime: document.getElementById('f-time').value || null,
+    venue: document.getElementById('f-venue').value,
+    status: document.getElementById('f-status').value,
+    round: document.getElementById('f-round').value
   };
+
   if (id) {
     await apiFetch(`${API}/tournaments/matches/${id}`,
       { method: 'PUT', body: JSON.stringify(body) });
@@ -526,26 +598,31 @@ async function saveMatch(id) {
     await apiFetch(`${API}/tournaments/${currentTournamentId}/matches`,
       { method: 'POST', body: JSON.stringify(body) });
   }
+
   closeModal();
   loadTabContent('matches');
 }
 
 async function deleteMatch(id) {
+  if (!isAdmin()) return alert("Access denied");
+
   if (!confirm('Delete this match?')) return;
   await apiFetch(`${API}/tournaments/matches/${id}`, { method: 'DELETE' });
   loadTabContent('matches');
 }
 
 // =============================================
-// GOAL / ASSIST FORM — Auto Time + Own Goal
+// GOAL / ASSIST FORM
 // =============================================
 function showAddEventForm(matchId, homeTeam, awayTeam, homeTeamId, awayTeamId) {
-  const now     = new Date();
+  if (!isAdmin()) return alert("Access denied");
+
+  const now = new Date();
   const autoMin = now.getHours() * 60 + now.getMinutes();
-  const matchMin = Math.min(autoMin % 90 + 1, 90); // rough match minute
+  const matchMin = Math.min(autoMin % 90 + 1, 90);
 
   const playerOpts = allPlayers.map(p =>
-    `<option value="${p.id}" data-team="${p.team?.id||''}">
+    `<option value="${p.id}" data-team="${p.team?.id || ''}">
       ${p.name} (${p.team?.name || '—'})
     </option>`).join('');
 
@@ -579,7 +656,7 @@ function showAddEventForm(matchId, homeTeam, awayTeam, homeTeamId, awayTeamId) {
     </div>
 
     <div class="form-group">
-      <label>⏱️ Minute (auto-filled)</label>
+      <label>⏱️ Minute</label>
       <input type="number" id="f-minute"
              value="${matchMin}" min="1" max="120"/>
     </div>
@@ -596,6 +673,7 @@ function toggleOwnGoal(isOwn) {
   const scorerGroup = document.getElementById('scorer-group');
   const assistGroup = document.getElementById('assist-group');
   const label = scorerGroup.querySelector('label');
+
   if (isOwn) {
     label.textContent = 'Own Goal Scored By';
     assistGroup.style.display = 'none';
@@ -609,37 +687,44 @@ function updatePlayersByTeam(teamId) {
   const filtered = allPlayers.filter(p => p.team?.id == teamId);
   const opts = filtered.map(p =>
     `<option value="${p.id}">${p.name}</option>`).join('');
+
   document.getElementById('f-player').innerHTML =
     opts || '<option value="">No players found</option>';
+
   const assistOpts = allPlayers.map(p =>
-    `<option value="${p.id}">${p.name} (${p.team?.name||'—'})</option>`).join('');
+    `<option value="${p.id}">${p.name} (${p.team?.name || '—'})</option>`).join('');
+
   document.getElementById('f-assist').innerHTML =
     `<option value="">-- No Assist --</option>${assistOpts}`;
 }
 
 async function saveEvent(matchId) {
+  if (!isAdmin()) return alert("Access denied");
+
   const assistId = document.getElementById('f-assist')?.value;
   const isOwnGoal = document.getElementById('f-owngoal').checked;
+
   const body = {
-    player:    { id: +document.getElementById('f-player').value },
-    team:      { id: +document.getElementById('f-team').value },
+    player: { id: +document.getElementById('f-player').value },
+    team: { id: +document.getElementById('f-team').value },
     eventType: 'GOAL',
-    minute:    +document.getElementById('f-minute').value,
-    ownGoal:   isOwnGoal,
-    assistBy:  (!isOwnGoal && assistId) ? { id: +assistId } : null
+    minute: +document.getElementById('f-minute').value,
+    ownGoal: isOwnGoal,
+    assistBy: (!isOwnGoal && assistId) ? { id: +assistId } : null
   };
+
   await apiFetch(`${API}/tournaments/matches/${matchId}/events`,
     { method: 'POST', body: JSON.stringify(body) });
+
   closeModal();
   loadTabContent('matches');
 }
 
 // =============================================
-// SHOW MATCH EVENTS — With Edit Option
+// SHOW MATCH EVENTS
 // =============================================
 async function showMatchEvents(matchId) {
-  const events = await apiFetch(
-    `${API}/tournaments/matches/${matchId}/events`);
+  const events = await apiFetch(`${API}/tournaments/matches/${matchId}/events`);
 
   if (events.length === 0) {
     openModal('Match Events', `
@@ -655,6 +740,7 @@ async function showMatchEvents(matchId) {
         <div class="event-row" style="justify-content:space-between;
              background:var(--surface2);border-radius:8px;padding:0.6rem 0.8rem;
              margin-bottom:0.5rem">
+
           <div style="display:flex;align-items:center;gap:0.6rem">
             <span class="event-min">${e.minute}'</span>
             <span>${e.ownGoal ? '🔴' : '⚽'}</span>
@@ -668,11 +754,13 @@ async function showMatchEvents(matchId) {
               <div style="font-size:0.75rem;color:var(--muted)">${e.team.name}</div>
             </div>
           </div>
+
           <div style="display:flex;gap:0.4rem">
+            ${isAdmin() ? `
             <button class="btn btn-warning btn-sm"
               onclick="showEditEventForm(${e.id},${matchId})">✏️ Edit</button>
             <button class="btn btn-danger btn-sm"
-              onclick="deleteEvent(${e.id})">✕</button>
+              onclick="deleteEvent(${e.id},${matchId})">✕</button>` : ''}
           </div>
         </div>`).join('')}
     </div>`);
@@ -682,8 +770,9 @@ async function showMatchEvents(matchId) {
 // EDIT EVENT FORM
 // =============================================
 async function showEditEventForm(eventId, matchId) {
-  const events = await apiFetch(
-    `${API}/tournaments/matches/${matchId}/events`);
+  if (!isAdmin()) return alert("Access denied");
+
+  const events = await apiFetch(`${API}/tournaments/matches/${matchId}/events`);
   const e = events.find(ev => ev.id === eventId);
   if (!e) return;
 
@@ -738,25 +827,33 @@ async function showEditEventForm(eventId, matchId) {
 }
 
 async function updateEvent(eventId, matchId) {
-  const assistId  = document.getElementById('f-assist').value;
+  if (!isAdmin()) return alert("Access denied");
+
+  const assistId = document.getElementById('f-assist').value;
   const isOwnGoal = document.getElementById('f-owngoal').checked;
+
   const body = {
-    player:    { id: +document.getElementById('f-player').value },
-    team:      { id: +document.getElementById('f-team').value },
+    player: { id: +document.getElementById('f-player').value },
+    team: { id: +document.getElementById('f-team').value },
     eventType: 'GOAL',
-    minute:    +document.getElementById('f-minute').value,
-    ownGoal:   isOwnGoal,
-    assistBy:  (!isOwnGoal && assistId) ? { id: +assistId } : null
+    minute: +document.getElementById('f-minute').value,
+    ownGoal: isOwnGoal,
+    assistBy: (!isOwnGoal && assistId) ? { id: +assistId } : null
   };
+
   await apiFetch(`${API}/tournaments/events/${eventId}`,
     { method: 'PUT', body: JSON.stringify(body) });
+
   closeModal();
   loadTabContent('matches');
 }
 
-async function deleteEvent(id) {
+async function deleteEvent(id, matchId) {
+  if (!isAdmin()) return alert("Access denied");
+
   if (!confirm('Remove this event?')) return;
   await apiFetch(`${API}/tournaments/events/${id}`, { method: 'DELETE' });
+
   closeModal();
   loadTabContent('matches');
 }
@@ -765,47 +862,56 @@ async function deleteEvent(id) {
 // TEAM MANAGEMENT
 // =============================================
 async function addTeamToTournament() {
+  if (!isAdmin()) return alert("Access denied");
+
   const teamId = document.getElementById('addTeamSelect').value;
   if (!teamId) return;
+
   await apiFetch(`${API}/tournaments/${currentTournamentId}/teams/${teamId}`,
     { method: 'POST' });
+
   loadTabContent('teams');
 }
 
 async function removeTeam(teamId) {
+  if (!isAdmin()) return alert("Access denied");
+
   if (!confirm('Remove this team from tournament?')) return;
-  await apiFetch(
-    `${API}/tournaments/${currentTournamentId}/teams/${teamId}`,
+
+  await apiFetch(`${API}/tournaments/${currentTournamentId}/teams/${teamId}`,
     { method: 'DELETE' });
+
   loadTabContent('teams');
 }
 
 function showTeamPlayers(teamId, teamName) {
   const players = allPlayers.filter(p => p.team?.id === teamId);
-  openModal(`👤 ${teamName} — Players`, players.length === 0
-    ? `<div class="empty-state">
-         <div class="icon">👤</div><p>No players found.</p>
-       </div>`
-    : `<div>
-        ${players.map(p => `
-          <div style="display:flex;align-items:center;gap:0.8rem;
-               background:var(--surface2);border-radius:8px;
-               padding:0.6rem 1rem;margin-bottom:0.5rem">
-            ${p.photoUrl
-              ? `<img src="${p.photoUrl}" style="width:36px;height:36px;
-                          border-radius:50%;object-fit:cover"/>`
-              : `<div style="width:36px;height:36px;border-radius:50%;
-                             background:var(--accent);display:flex;
-                             align-items:center;justify-content:center;
-                             font-weight:700;color:#000">
-                   ${p.name.charAt(0)}
-                 </div>`}
-            <div>
-              <div style="font-weight:600">#${p.jerseyNumber} ${p.name}</div>
-              <div style="font-size:0.78rem;color:var(--muted)">
-                ${p.position || '—'} · ${p.nationality || '—'} · Age ${p.age || '—'}
+
+  openModal(`👤 ${teamName} — Players`,
+    players.length === 0
+      ? `<div class="empty-state">
+           <div class="icon">👤</div><p>No players found.</p>
+         </div>`
+      : `<div>
+          ${players.map(p => `
+            <div style="display:flex;align-items:center;gap:0.8rem;
+                 background:var(--surface2);border-radius:8px;
+                 padding:0.6rem 1rem;margin-bottom:0.5rem">
+              ${p.photoUrl
+                ? `<img src="${p.photoUrl}" style="width:36px;height:36px;
+                            border-radius:50%;object-fit:cover"/>`
+                : `<div style="width:36px;height:36px;border-radius:50%;
+                               background:var(--accent);display:flex;
+                               align-items:center;justify-content:center;
+                               font-weight:700;color:#000">
+                     ${p.name.charAt(0)}
+                   </div>`}
+              <div>
+                <div style="font-weight:600">#${p.jerseyNumber} ${p.name}</div>
+                <div style="font-size:0.78rem;color:var(--muted)">
+                  ${p.position || '—'} · ${p.nationality || '—'} · Age ${p.age || '—'}
+                </div>
               </div>
-            </div>
-          </div>`).join('')}
-      </div>`);
+            </div>`).join('')}
+        </div>`);
 }

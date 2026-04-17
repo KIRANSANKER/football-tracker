@@ -107,11 +107,19 @@ async function handleSignin(e) {
       body: JSON.stringify({ email: email, password: pw })
     });
 
-    if (response.ok) {
-      showToast('⚽ Successfully signed in!');
-      setTimeout(() => {
-      window.location.href = 'dashboard.html';
-      }, 1500);
+	if (response.ok) {
+	  const data = await response.json();
+
+	  localStorage.setItem("role", data.role);
+	  localStorage.setItem("name", data.name);
+	  localStorage.setItem("email", data.email);
+
+	  showToast('⚽ Successfully signed in!');
+
+	  setTimeout(() => {
+	    window.location.href = 'dashboard.html';
+	  }, 1500);
+	
     } else {
       const errorMsg = await response.text();
       showToast('⚠️ ' + (errorMsg || 'Invalid email or password'));

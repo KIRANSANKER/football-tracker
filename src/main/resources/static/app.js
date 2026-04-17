@@ -1,7 +1,7 @@
 // =============================================
 // Football Tracker - app.js
 // Updated: Player Photos, Simplified Standings,
-//          League Stats Filter
+//          League Stats Filter + Role Based Access
 // =============================================
 
 // =============================================
@@ -32,11 +32,17 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // =============================================
+// ROLE CHECK (ADMIN / USER)
+// =============================================
+const isAdmin = () => localStorage.getItem("role") === "ADMIN";
+
+// =============================================
 // API + UTILITY
 // =============================================
 const API = window.location.hostname === "localhost"
   ? "http://localhost:8080/api"
   : "/api";
+
 let allTeams = [];
 let allPlayers = [];
 
@@ -141,7 +147,7 @@ async function renderMatches() {
   app().innerHTML = `
     <div class="section-header">
       <h2>📅 Matches</h2>
-      <button class="btn btn-primary" onclick="showAddMatchForm()">+ Add Match</button>
+      ${isAdmin() ? `<button class="btn btn-primary" onclick="showAddMatchForm()">+ Add Match</button>` : ""}
     </div>
 
     ${data.length === 0
@@ -163,6 +169,8 @@ async function renderMatches() {
 }
 
 function showAddMatchForm() {
+  if (!isAdmin()) return alert("Access denied");
+
   const teamOptions = allTeams.map(t =>
     `<option value="${t.id}">${t.name}</option>`).join('');
 
@@ -215,6 +223,8 @@ function showAddMatchForm() {
 }
 
 async function saveMatch() {
+  if (!isAdmin()) return alert("Access denied");
+
   const body = {
     homeTeam: { id: +document.getElementById('f-home').value },
     awayTeam: { id: +document.getElementById('f-away').value },
@@ -243,7 +253,7 @@ async function renderTeams() {
   app().innerHTML = `
     <div class="section-header">
       <h2>🛡️ Teams</h2>
-      <button class="btn btn-primary" onclick="showTeamForm()">+ Add Team</button>
+      ${isAdmin() ? `<button class="btn btn-primary" onclick="showTeamForm()">+ Add Team</button>` : ""}
     </div>
 
     <div class="grid">
@@ -252,6 +262,8 @@ async function renderTeams() {
           <h3>${t.name}</h3>
           <p>📍 ${t.city || '—'}</p>
           <p>📅 Founded: ${t.foundedYear || '—'}</p>
+
+          ${isAdmin() ? `
           <div class="card-actions">
             <button class="btn btn-warning btn-sm"
               onclick="showTeamForm(${t.id},'${t.name}','${t.city}',${t.foundedYear})">
@@ -260,13 +272,15 @@ async function renderTeams() {
             <button class="btn btn-danger btn-sm" onclick="deleteTeam(${t.id})">
               Delete
             </button>
-          </div>
+          </div>` : ""}
         </div>
       `).join('')}
     </div>`;
 }
 
 function showTeamForm(id = null, name = '', city = '', foundedYear = '') {
+  if (!isAdmin()) return alert("Access denied");
+
   openModal(id ? 'Edit Team' : 'Add Team', `
     <div class="form-group">
       <label>Team Name</label>
@@ -291,6 +305,8 @@ function showTeamForm(id = null, name = '', city = '', foundedYear = '') {
 }
 
 async function saveTeam(id) {
+  if (!isAdmin()) return alert("Access denied");
+
   const body = {
     name: document.getElementById('f-name').value,
     city: document.getElementById('f-city').value,
@@ -307,6 +323,8 @@ async function saveTeam(id) {
 }
 
 async function deleteTeam(id) {
+  if (!isAdmin()) return alert("Access denied");
+
   if (!confirm('Delete this team?')) return;
   await apiFetch(`${API}/teams/${id}`, { method: 'DELETE' });
   renderTeams();
@@ -322,7 +340,7 @@ async function renderPlayers() {
   app().innerHTML = `
     <div class="section-header">
       <h2>👤 Players</h2>
-      <button class="btn btn-primary" onclick="showPlayerForm()">+ Add Player</button>
+      ${isAdmin() ? `<button class="btn btn-primary" onclick="showPlayerForm()">+ Add Player</button>` : ""}
     </div>
 
     <div class="grid">
@@ -343,6 +361,7 @@ async function renderPlayers() {
           <p>🎂 Age: ${p.age || '—'}</p>
           <p>🛡️ ${p.team?.name || 'No Team'}</p>
 
+          ${isAdmin() ? `
           <div class="card-actions">
             <button class="btn btn-warning btn-sm" onclick="editPlayer(${p.id})">
               Edit
@@ -350,13 +369,15 @@ async function renderPlayers() {
             <button class="btn btn-danger btn-sm" onclick="deletePlayer(${p.id})">
               Delete
             </button>
-          </div>
+          </div>` : ""}
         </div>
       `).join('')}
     </div>`;
 }
 
 function editPlayer(id) {
+  if (!isAdmin()) return alert("Access denied");
+
   const p = allPlayers.find(x => x.id === id);
   if (!p) return;
 
@@ -376,13 +397,14 @@ function showPlayerForm(id = null, name = '', position = '',
   jersey = 0, nationality = '', age = 0,
   teamId = null, photoUrl = '') {
 
+  if (!isAdmin()) return alert("Access denied");
+
   const teamOptions = allTeams.map(t =>
     `<option value="${t.id}" ${t.id === teamId ? 'selected' : ''}>${t.name}</option>`
   ).join('');
 
   openModal(id ? 'Edit Player' : 'Add Player', `
 
-    <!-- Photo Preview -->
     <div style="text-align:center;margin-bottom:1rem">
       <div id="photoPreview" style="width:80px;height:80px;border-radius:50%;
            margin:0 auto 0.5rem;overflow:hidden;background:var(--surface2);
@@ -395,7 +417,6 @@ function showPlayerForm(id = null, name = '', position = '',
       <small style="color:var(--muted)">Player Photo</small>
     </div>
 
-    <!-- Photo URL -->
     <div class="form-group">
       <label>📷 Photo — Enter URL</label>
       <input type="text" id="f-photoUrl" value="${photoUrl}"
@@ -403,7 +424,6 @@ function showPlayerForm(id = null, name = '', position = '',
              oninput="previewPhotoUrl(this.value)"/>
     </div>
 
-    <!-- Upload Photo -->
     <div class="form-group">
       <label>📁 Or Upload from Device</label>
       <input type="file" id="f-photoFile" accept="image/*"
@@ -461,7 +481,6 @@ function showPlayerForm(id = null, name = '', position = '',
   `);
 }
 
-// Preview photo from URL
 function previewPhotoUrl(url) {
   const preview = document.getElementById('photoPreview');
 
@@ -474,12 +493,10 @@ function previewPhotoUrl(url) {
   }
 }
 
-// Preview photo from file
 function previewPhotoFile(input) {
   const file = input.files[0];
   if (!file) return;
 
-  // Max 1MB
   if (file.size > 1024 * 1024) {
     alert('⚠️ Image too large! Please use an image under 1MB.');
     input.value = '';
@@ -497,10 +514,10 @@ function previewPhotoFile(input) {
 }
 
 async function savePlayer(id) {
+  if (!isAdmin()) return alert("Access denied");
+
   const teamId = document.getElementById('f-team').value;
   const photoUrl = document.getElementById('f-photoUrl').value;
-
-  console.log("Saving Photo URL length:", photoUrl?.length);
 
   const body = {
     name: document.getElementById('f-name').value,
@@ -525,13 +542,15 @@ async function savePlayer(id) {
 }
 
 async function deletePlayer(id) {
+  if (!isAdmin()) return alert("Access denied");
+
   if (!confirm('Delete this player?')) return;
   await apiFetch(`${API}/players/${id}`, { method: 'DELETE' });
   renderPlayers();
 }
 
 // =============================================
-// STATS — Total + League Wise with Filter
+// STATS
 // =============================================
 let tournaments = [];
 let selectedTournId = 'all';
@@ -542,7 +561,7 @@ async function renderStats() {
   app().innerHTML = `
     <div class="section-header">
       <h2>📊 Player Statistics</h2>
-      <button class="btn btn-primary" onclick="showStatsForm()">+ Add Stats</button>
+      ${isAdmin() ? `<button class="btn btn-primary" onclick="showStatsForm()">+ Add Stats</button>` : ""}
     </div>
 
     <div class="stats-filter-bar">
@@ -582,7 +601,6 @@ async function filterStats(tournId, el) {
   }
 }
 
-// ---- Total Stats (all matches) ----
 async function renderTotalStats(content) {
   const [stats, players] = await Promise.all([
     apiFetch(`${API}/stats/top-scorers`),
@@ -655,7 +673,6 @@ async function renderTotalStats(content) {
   `;
 }
 
-// ---- Tournament / League Stats ----
 async function renderTournamentStats(tournId, content) {
   const data = await apiFetch(`${API}/tournaments/${tournId}/stats`).catch(() => []);
 
@@ -741,6 +758,8 @@ async function renderTournamentStats(tournId, content) {
 }
 
 async function showStatsForm() {
+  if (!isAdmin()) return alert("Access denied");
+
   const [players, matches] = await Promise.all([
     apiFetch(`${API}/players`),
     apiFetch(`${API}/matches`)
@@ -784,6 +803,8 @@ async function showStatsForm() {
 }
 
 async function saveStats() {
+  if (!isAdmin()) return alert("Access denied");
+
   const body = {
     player: { id: +document.getElementById('f-player').value },
     match: { id: +document.getElementById('f-match').value },

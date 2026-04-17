@@ -5,6 +5,12 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "users")
 public class User {
+
+    public enum Role {
+        ADMIN,
+        USER
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -18,12 +24,14 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    // Empty Constructor needed by Spring/JPA
-    public User() {
-    }
+    // NEW FIELD
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role = Role.USER;   // default USER
+
+    public User() {}
 
     // --- GETTERS & SETTERS ---
-
     public Long getId() {
         return id;
     }
@@ -54,5 +62,14 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    // ROLE GET/SET
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
     }
 }
