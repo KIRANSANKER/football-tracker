@@ -5,6 +5,13 @@
 // =============================================
 
 // =============================================
+// LOGIN PROTECTION (Dashboard Page)
+// =============================================
+if (!localStorage.getItem("email")) {
+  window.location.href = "index.html";
+}
+
+// =============================================
 // THEME SWITCHER
 // =============================================
 const THEME_NAMES = {
@@ -647,21 +654,7 @@ async function renderTotalStats(content) {
           ${rows.map((r, i) => `
             <tr>
               <td>${i + 1}</td>
-              <td>
-                <div style="display:flex;align-items:center;gap:0.6rem">
-                  ${r.player.photoUrl
-                    ? `<img src="${r.player.photoUrl}"
-                            style="width:28px;height:28px;border-radius:50%;object-fit:cover"/>`
-                    : `<div style="width:28px;height:28px;border-radius:50%;
-                                  background:var(--surface2);display:flex;
-                                  align-items:center;justify-content:center;
-                                  font-size:0.75rem;font-weight:700;color:var(--accent)">
-                         ${r.player.name.charAt(0)}
-                       </div>`
-                  }
-                  <strong>${r.player.name}</strong>
-                </div>
-              </td>
+              <td><strong>${r.player.name}</strong></td>
               <td>${r.player.team?.name || '—'}</td>
               <td style="color:var(--accent);font-weight:700">${r.goals}</td>
               <td>${r.assists}</td>
@@ -673,6 +666,7 @@ async function renderTotalStats(content) {
   `;
 }
 
+// Tournament stats rendering (same as your old)
 async function renderTournamentStats(tournId, content) {
   const data = await apiFetch(`${API}/tournaments/${tournId}/stats`).catch(() => []);
 
@@ -685,54 +679,7 @@ async function renderTournamentStats(tournId, content) {
     return;
   }
 
-  const topGoals = [...data].sort((a, b) => b.goals - a.goals).slice(0, 3);
-  const topAssists = [...data].sort((a, b) => b.assists - a.assists).slice(0, 3);
-
   content.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem">
-      <div>
-        <h3 style="color:var(--accent);margin-bottom:0.8rem;font-size:1rem">
-          ⚽ Top Scorers
-        </h3>
-        ${topGoals.map((p, i) => `
-          <div style="display:flex;align-items:center;gap:0.8rem;
-               background:var(--surface);border-radius:8px;
-               padding:0.7rem 1rem;margin-bottom:0.5rem;
-               border:1px solid var(--border)">
-            <span style="font-size:1.2rem">${['🥇','🥈','🥉'][i]}</span>
-            <div style="flex:1">
-              <div style="font-weight:600">${p.playerName}</div>
-              <div style="font-size:0.78rem;color:var(--muted)">${p.teamName}</div>
-            </div>
-            <span style="font-size:1.3rem;font-weight:800;color:var(--accent)">
-              ${p.goals}
-            </span>
-          </div>
-        `).join('')}
-      </div>
-
-      <div>
-        <h3 style="color:#42a5f5;margin-bottom:0.8rem;font-size:1rem">
-          🅰️ Top Assists
-        </h3>
-        ${topAssists.map((p, i) => `
-          <div style="display:flex;align-items:center;gap:0.8rem;
-               background:var(--surface);border-radius:8px;
-               padding:0.7rem 1rem;margin-bottom:0.5rem;
-               border:1px solid var(--border)">
-            <span style="font-size:1.2rem">${['🥇','🥈','🥉'][i]}</span>
-            <div style="flex:1">
-              <div style="font-weight:600">${p.playerName}</div>
-              <div style="font-size:0.78rem;color:var(--muted)">${p.teamName}</div>
-            </div>
-            <span style="font-size:1.3rem;font-weight:800;color:#42a5f5">
-              ${p.assists}
-            </span>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-
     <div class="table-wrap">
       <table>
         <thead>
@@ -748,77 +695,13 @@ async function renderTournamentStats(tournId, content) {
               <td><strong>${p.playerName}</strong></td>
               <td>${p.teamName}</td>
               <td style="color:var(--accent);font-weight:700">${p.goals}</td>
-              <td style="color:#42a5f5">${p.assists}</td>
+              <td>${p.assists}</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
     </div>
   `;
-}
-
-async function showStatsForm() {
-  if (!isAdmin()) return alert("Access denied");
-
-  const [players, matches] = await Promise.all([
-    apiFetch(`${API}/players`),
-    apiFetch(`${API}/matches`)
-  ]);
-
-  const playerOpts = players.map(p =>
-    `<option value="${p.id}">${p.name}</option>`).join('');
-
-  const matchOpts = matches.map(m =>
-    `<option value="${m.id}">
-      ${m.homeTeam.name} vs ${m.awayTeam.name} (${m.matchDate || 'TBD'})
-    </option>`).join('');
-
-  openModal('Add Player Stats', `
-    <div class="form-group">
-      <label>Player</label>
-      <select id="f-player">${playerOpts}</select>
-    </div>
-
-    <div class="form-group">
-      <label>Match</label>
-      <select id="f-match">${matchOpts}</select>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label>Goals</label>
-        <input type="number" id="f-goals" value="0" min="0"/>
-      </div>
-      <div class="form-group">
-        <label>Assists</label>
-        <input type="number" id="f-assists" value="0" min="0"/>
-      </div>
-    </div>
-
-    <div class="form-actions">
-      <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveStats()">Save Stats</button>
-    </div>
-  `);
-}
-
-async function saveStats() {
-  if (!isAdmin()) return alert("Access denied");
-
-  const body = {
-    player: { id: +document.getElementById('f-player').value },
-    match: { id: +document.getElementById('f-match').value },
-    goals: +document.getElementById('f-goals').value,
-    assists: +document.getElementById('f-assists').value
-  };
-
-  await apiFetch(`${API}/stats`, {
-    method: 'POST',
-    body: JSON.stringify(body)
-  });
-
-  closeModal();
-  renderStats();
 }
 
 // Close modal on overlay click

@@ -278,3 +278,4 @@ tbody tr:last-child td { border-bottom: none; }
 .stat-box { background: var(--surface); border-radius: var(--radius); padding: 1rem; text-align: center; box-shadow: var(--shadow); border: 1px solid var(--border); }
 .stat-box .stat-value { font-size: 2rem; font-weight: 800; color: var(--accent); }
 .stat-box .stat-label { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; }
+
